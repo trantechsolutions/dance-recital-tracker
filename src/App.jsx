@@ -6,7 +6,7 @@ import { clsx } from 'clsx';
 // Icons
 import { 
   List, Search, Users, Settings, ShieldAlert, 
-  Calendar, Building2, LogOut
+  Calendar, Building2, LogOut, User
 } from 'lucide-react';
 
 // Components
@@ -20,6 +20,7 @@ import NavButton from './components/ui/NavButton';
 import LiveTrackerHero from './components/program/LiveTrackerHero';
 import StudioSelector from './components/StudioSelector';
 import LoginScreen from './components/LoginScreen';
+import ShowSelector from './components/ui/ShowSelector';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('program');
@@ -141,16 +142,32 @@ export default function App() {
           </button>
         )}
         
+        {/* Main Links (Pushes bottom section down) */}
         <div className="space-y-2 flex-1">
           <SidebarLink active={activeTab === 'program'} onClick={() => setActiveTab('program')} icon={<List size={20}/>} label="Program View" />
           <SidebarLink active={activeTab === 'searchActs'} onClick={() => setActiveTab('searchActs')} icon={<Search size={20}/>} label="Search Acts" />
           <SidebarLink active={activeTab === 'searchDancers'} onClick={() => setActiveTab('searchDancers')} icon={<Users size={20}/>} label="Dancer Search" />
+        </div>
+
+        {/* Bottom Administrative Actions & Profile */}
+        <div className="mt-auto pt-6 space-y-2 border-t border-slate-200 dark:border-slate-700">
           {isAuthorized && (
             <SidebarLink active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} icon={<ShieldAlert size={20}/>} label="Admin Console" />
           )}
+          <SidebarLink active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={20}/>} label="App Settings" />
+          
+          {user && (
+            <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl flex items-center gap-3 border border-slate-100 dark:border-slate-800 shadow-inner">
+              <div className="w-10 h-10 bg-pink-100 dark:bg-pink-900/30 text-pink-600 rounded-full flex items-center justify-center shrink-0">
+                <User size={20} />
+              </div>
+              <div className="overflow-hidden flex-1">
+                <p className="text-xs font-bold dark:text-white truncate">{user.email}</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-500 mt-0.5">Logged In</p>
+              </div>
+            </div>
+          )}
         </div>
-
-        <SidebarLink active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={20}/>} label="App Settings" />
       </nav>
 
       {/* --- MAIN CONTENT AREA --- */}
@@ -158,45 +175,45 @@ export default function App() {
         <StickyHeader currentAct={currentAct} isAuthorized={isAuthorized} onUpdate={updateActNumber} />
         
         <div className="max-w-4xl mx-auto px-4 md:px-12 pt-8">
-          <header className="md:hidden flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-black text-pink-600 tracking-tight capitalize truncate pr-4">
-              {orgId ? orgId.replace(/-/g, ' ') : "Global Admin"}
-            </h1>
-            {orgId && (
-              <button 
-                onClick={() => setOrgId(null)}
-                className="p-2 bg-slate-200 dark:bg-slate-800 rounded-full text-slate-500 hover:text-pink-600 transition-colors"
-                title="Switch Studio"
-              >
-                <LogOut size={20} className="rotate-180" />
-              </button>
+          <header className="md:hidden flex flex-col gap-4 mb-8">
+            <div className="flex justify-between items-center">
+              <h1 className="text-3xl font-black text-pink-600 tracking-tight capitalize truncate pr-4">
+                {orgId ? orgId.replace(/-/g, ' ') : "Global Admin"}
+              </h1>
+              {orgId && (
+                <button 
+                  onClick={() => setOrgId(null)}
+                  className="p-2 bg-slate-200 dark:bg-slate-800 rounded-full text-slate-500 hover:text-pink-600 transition-colors shrink-0"
+                  title="Switch Studio"
+                >
+                  <LogOut size={20} className="rotate-180" />
+                </button>
+              )}
+            </div>
+
+            {/* Mobile Profile Indicator */}
+            {user && (
+              <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm animate-in fade-in">
+                 <div className="w-8 h-8 bg-pink-100 dark:bg-pink-900/30 text-pink-600 rounded-full flex items-center justify-center shrink-0">
+                   <User size={16} />
+                 </div>
+                 <div className="overflow-hidden flex-1">
+                   <p className="text-xs font-bold dark:text-white truncate">{user.email}</p>
+                 </div>
+                 <div className="flex items-center gap-1 text-[9px] font-black uppercase text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md shrink-0">
+                   Logged In
+                 </div>
+              </div>
             )}
           </header>
 
-          {/* Responsive Show Selector */}
+          {/* Custom Show Selector */}
           {activeTab !== 'admin' && activeTab !== 'settings' && (
-            <div className="mb-8 max-w-2xl mx-auto md:mx-0">
-               <div className="bg-white dark:bg-slate-800 p-5 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-5">
-                  <div className="shrink-0 p-4 bg-pink-50 dark:bg-pink-900/20 rounded-2xl text-pink-600">
-                    <Calendar size={28} />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-[10px] font-black uppercase text-slate-400 mb-1 ml-1 tracking-widest">Select Performance</label>
-                    <select 
-                      className="w-full bg-transparent dark:text-white text-slate-900 font-black text-lg outline-none cursor-pointer appearance-none"
-                      value={selectedShow}
-                      onChange={e => setSelectedShow(e.target.value)}
-                    >
-                      <option value="" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">-- Choose Show --</option>
-                      {recitalData && Object.keys(recitalData).map(k => (
-                        <option key={k} value={k} className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
-                          {recitalData[k].label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-               </div>
-            </div>
+             <ShowSelector 
+                recitalData={recitalData} 
+                selectedShow={selectedShow} 
+                setSelectedShow={setSelectedShow} 
+             />
           )}
 
           <main className="animate-in fade-in slide-in-from-bottom-2 duration-700">

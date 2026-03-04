@@ -188,14 +188,40 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
 
       {/* --- SUPER ADMIN NAVIGATION --- */}
       {isSuperAdmin && (
-        <div className="flex gap-2 p-1 bg-slate-200 dark:bg-slate-800 rounded-2xl overflow-x-auto hide-scrollbar">
-          <button onClick={() => setActiveAdminTab('shows')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm whitespace-nowrap transition-all", activeAdminTab === 'shows' ? "bg-white dark:bg-slate-700 text-pink-600 shadow-sm" : "text-slate-500 hover:text-slate-800 dark:hover:text-white")}>
+        <div className="flex flex-col sm:flex-row gap-2 p-2 bg-slate-200 dark:bg-slate-800 rounded-[2rem] sm:rounded-2xl">
+          <button 
+            onClick={() => setActiveAdminTab('shows')} 
+            className={clsx(
+              "flex-1 flex items-center justify-center sm:justify-start md:justify-center gap-3 px-6 py-4 sm:py-3 rounded-[1.5rem] sm:rounded-xl font-bold text-sm transition-all", 
+              activeAdminTab === 'shows' 
+                ? "bg-white dark:bg-slate-700 text-pink-600 shadow-md sm:shadow-sm" 
+                : "text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-300/50 dark:hover:bg-slate-700/50"
+            )}
+          >
             <Calendar size={18} /> Manage Shows
           </button>
-          <button onClick={() => setActiveAdminTab('studio')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm whitespace-nowrap transition-all", activeAdminTab === 'studio' ? "bg-white dark:bg-slate-700 text-pink-600 shadow-sm" : "text-slate-500 hover:text-slate-800 dark:hover:text-white")}>
+          
+          <button 
+            onClick={() => setActiveAdminTab('studio')} 
+            className={clsx(
+              "flex-1 flex items-center justify-center sm:justify-start md:justify-center gap-3 px-6 py-4 sm:py-3 rounded-[1.5rem] sm:rounded-xl font-bold text-sm transition-all", 
+              activeAdminTab === 'studio' 
+                ? "bg-white dark:bg-slate-700 text-pink-600 shadow-md sm:shadow-sm" 
+                : "text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-300/50 dark:hover:bg-slate-700/50"
+            )}
+          >
             <Building2 size={18} /> Studio Settings
           </button>
-          <button onClick={() => setActiveAdminTab('users')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm whitespace-nowrap transition-all", activeAdminTab === 'users' ? "bg-white dark:bg-slate-700 text-pink-600 shadow-sm" : "text-slate-500 hover:text-slate-800 dark:hover:text-white")}>
+          
+          <button 
+            onClick={() => setActiveAdminTab('users')} 
+            className={clsx(
+              "flex-1 flex items-center justify-center sm:justify-start md:justify-center gap-3 px-6 py-4 sm:py-3 rounded-[1.5rem] sm:rounded-xl font-bold text-sm transition-all", 
+              activeAdminTab === 'users' 
+                ? "bg-white dark:bg-slate-700 text-pink-600 shadow-md sm:shadow-sm" 
+                : "text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-300/50 dark:hover:bg-slate-700/50"
+            )}
+          >
             <UserIcon size={18} /> Registered Users
           </button>
         </div>
