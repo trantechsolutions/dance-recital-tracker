@@ -7,7 +7,7 @@ export default function LiveTrackerHero({ currentAct, isAuthorized, onUpdate, on
 
   return (
     <div className="mb-8">
-      {isAuthorized && (
+      {/* {isAuthorized && (
         <button 
           onClick={onToggle}
           className={clsx(
@@ -43,7 +43,7 @@ export default function LiveTrackerHero({ currentAct, isAuthorized, onUpdate, on
             </div>
           )}
         </div>
-      )}
+      )} */}
     </div>
   );
 }
