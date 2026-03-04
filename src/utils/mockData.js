@@ -41,3 +41,8 @@ export const generateMockData = () => {
     saturday: createShow("Saturday Grand Finale", "2026-06-06T14:00:00.000Z")
   };
 };
+
+export const mockCsvTemplate = `number,title,performers
+1,Elite Ballet,Aiden;Zoe;Grace
+2,Musical Theater,Sebastian;David;Carter
+3,Production Finale,Callen;Sophia;Liam;Emma;Noah;Olivia;Mason`;
