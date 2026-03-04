@@ -1,0 +1,174 @@
+/* --- Custom App Styles --- */
+:root {
+    --primary-color: #db2777;
+    --primary-light: #f9a8d4;
+    --primary-rgb: 219, 39, 119; /* RGB value for pink theme */
+    --text-light: #f9fafb;
+    --text-dark: #1f2937;
+    --bg-light: #f9fafb;
+    --bg-dark: #111827;
+    --surface-light: #ffffff;
+    --surface-dark: #1f2937;
+    --border-light: #e5e7eb;
+    --border-dark: #4b5563;
+}
+
+body {
+    transition: background-color 0.3s, color 0.3s;
+}
+
+/* Custom header color */
+.header h1 {
+    color: var(--primary-color);
+}
+
+/* Custom tracker styles */
+.now-performing {
+    background-color: var(--primary-color);
+}
+
+.act-card.current-act {
+    border: 3px solid var(--primary-color);
+    transform: scale(1.02);
+}
+
+.act-card.favorite {
+    border-left: 5px solid var(--primary-color);
+}
+
+.sticky-tracker {
+    background-color: var(--primary-color);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1050; /* Above Bootstrap nav */
+    transform: translateY(-100%);
+    transition: transform 0.3s ease-in-out;
+}
+
+.sticky-tracker.visible {
+    transform: translateY(0);
+}
+
+/* Bottom nav adjustments */
+.bottom-nav {
+    border-top: 1px solid var(--border-light);
+    background-color: var(--surface-light) !important; /* Use important to override Bootstrap */
+}
+
+.bottom-nav .btn {
+    border-radius: 0.5rem;
+    border: none;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+
+.bottom-nav .btn.active {
+    color: var(--primary-color);
+    background-color: rgba(var(--primary-rgb), 0.1); /* Use a highlight color */
+}
+
+/* Custom Focus Outline for Bootstrap Components */
+.form-select:focus,
+.accordion-button:focus {
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 0.25rem rgba(var(--primary-rgb), 0.25);
+}
+
+/* Accordion Button Customization */
+.accordion-button {
+    color: var(--text-dark);
+}
+.accordion-button:not(.collapsed) {
+    color: var(--primary-color);
+    background-color: rgba(var(--primary-rgb), 0.05);
+}
+.accordion-button:not(.collapsed)::after {
+    --bs-accordion-btn-icon: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23db2777'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+}
+
+
+/* Dark Theme Overrides */
+[data-bs-theme="dark"] {
+    --bs-body-color: var(--text-light);
+    --bs-body-bg: var(--bg-dark);
+    --bs-border-color: var(--border-dark);
+}
+
+[data-bs-theme="dark"] .form-select,
+[data-bs-theme="dark"] .form-control {
+    background-color: var(--surface-dark);
+    color: var(--text-light);
+}
+
+[data-bs-theme="dark"] .accordion-button {
+    background-color: var(--surface-dark);
+    color: var(--text-light);
+}
+
+[data-bs-theme="dark"] .accordion-button::after {
+    --bs-accordion-btn-icon: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23f9fafb'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+}
+
+[data-bs-theme="dark"] .accordion-button:not(.collapsed) {
+    color: var(--primary-light);
+    background-color: rgba(249, 168, 212, 0.1);
+}
+
+[data-bs-theme="dark"] .accordion-button:not(.collapsed)::after {
+    --bs-accordion-btn-icon: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23f9a8d4'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+}
+
+[data-bs-theme="dark"] .list-group-item {
+     background-color: var(--surface-dark);
+}
+
+[data-bs-theme="dark"] .bottom-nav {
+    background-color: var(--surface-dark) !important;
+    border-top-color: var(--border-dark);
+}
+
+[data-bs-theme="dark"] .bottom-nav .btn {
+    color: #9ca3af;
+}
+
+[data-bs-theme="dark"] .bottom-nav .btn.active {
+    color: var(--primary-light);
+    background-color: rgba(249, 168, 212, 0.15); 
+}
+
+[data-bs-theme="dark"] .act-card.favorite {
+    border-left: 5px solid var(--primary-light);
+}
+
+[data-bs-theme="dark"] .act-card.current-act {
+    border: 3px solid var(--primary-light);
+}
+
+/* --- Settings Page Buttons --- */
+.btn-group .btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+[data-bs-theme="dark"] .btn-group .btn-primary {
+    background-color: var(--primary-light);
+    border-color: var(--primary-light);
+    color: var(--text-dark);
+}
+
+
+/* --- Favorite Star Icon --- */
+.favorite-icon {
+    color: var(--primary-color);
+}
+.favorite-icon.inactive {
+    color: #6c757d;
+}
+
+[data-bs-theme="dark"] .favorite-icon {
+    color: var(--primary-light);
+}
+[data-bs-theme="dark"] .favorite-icon.inactive {
+    color: #9ca3af;
+}
