@@ -114,8 +114,8 @@ export default function App() {
       {/* --- DESKTOP SIDEBAR --- */}
       <nav className="hidden md:flex md:w-72 md:flex-col md:fixed md:h-full bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-8 z-50">
         <div className="mb-12">
-          <h1 className="text-3xl font-black text-pink-600 tracking-tighter leading-none">Dancer's<br/>Pointe</h1>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-3">Recital Portal</p>
+          <h1 className="text-3xl font-black text-pink-600 tracking-tighter leading-none">Dancer Recital</h1>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-3">Tracker</p>
         </div>
         
         <div className="space-y-2 flex-1">
