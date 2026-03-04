@@ -1,12 +1,12 @@
-// dancers-pointe-recital/src/components/admin/AdminDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { 
-  Save, Calendar, Users, Plus, Trash, Database, 
-  AlertCircle, X, Check, Clock, GripVertical, Trash2, Tag
+  Save, Calendar, Users, Plus, Trash2, Database, 
+  AlertCircle, X, Check, GripVertical, Building2, Shield
 } from 'lucide-react';
-import { doc, setDoc, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, deleteDoc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from '../../firebase';
 import { clsx } from 'clsx';
+import { generateMockData } from '../../utils/mockData';
 
 // DND Kit Imports
 import {
@@ -19,14 +19,20 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-export default function AdminDashboard({ recitalData, isAuthorized, setRecitalData }) {
+export default function AdminDashboard({ recitalData, user, isSuperAdmin, setRecitalData, orgId, setOrgId }) {
   const [selectedShowId, setSelectedShowId] = useState('');
   const [editData, setEditData] = useState(null);
+  
+  // Organization State
+  const [orgData, setOrgData] = useState({ name: '', admins: [] });
+  const [isCreatingOrg, setIsCreatingOrg] = useState(false);
+  const [newOrgForm, setNewOrgForm] = useState({ id: '', name: '', adminEmail: '' });
+  const [newOrgAdminEmail, setNewOrgAdminEmail] = useState('');
+
+  // UI State
   const [migrationStatus, setMigrationStatus] = useState({ loading: false, error: null });
   const [isAddingShow, setIsAddingShow] = useState(false);
   const [newShowForm, setNewShowForm] = useState({ date: '', time: '', label: '' });
-  
-  // Custom Toast State
   const [toast, setToast] = useState(null);
 
   const sensors = useSensors(
@@ -35,6 +41,17 @@ export default function AdminDashboard({ recitalData, isAuthorized, setRecitalDa
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  // Fetch the current Organization's top-level data
+  useEffect(() => {
+    const fetchOrg = async () => {
+      if (!orgId) return;
+      const snap = await getDoc(doc(db, 'organizations', orgId));
+      if (snap.exists()) setOrgData(snap.data());
+    };
+    fetchOrg();
+  }, [orgId]);
+
+  // Sync selected show data for editing
   useEffect(() => {
     if (selectedShowId && recitalData?.[selectedShowId]) {
       setEditData(JSON.parse(JSON.stringify(recitalData[selectedShowId])));
@@ -43,30 +60,38 @@ export default function AdminDashboard({ recitalData, isAuthorized, setRecitalDa
     }
   }, [selectedShowId, recitalData]);
 
-  if (!isAuthorized) return <div className="p-20 text-center font-black text-slate-300 uppercase tracking-widest">Access Denied</div>;
-
-  // Helper function to trigger toasts
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3000); // Auto-dismiss after 3 seconds
+    setTimeout(() => setToast(null), 3000);
   };
 
-  const runMigration = async () => {
-    setMigrationStatus({ loading: true, error: null });
+  // --- ORG MANAGEMENT FUNCTIONS ---
+  const handleCreateOrg = async () => {
+    if (!newOrgForm.id || !newOrgForm.name) return showToast("ID and Name required", "error");
     try {
-      if (!recitalData) throw new Error("No data found.");
-      for (const id of Object.keys(recitalData)) {
-        const clean = JSON.parse(JSON.stringify(recitalData[id], (k, v) => v === undefined ? null : v));
-        await setDoc(doc(db, "program_data", id), clean);
-      }
-      showToast("Database Synchronized successfully", "success");
-      setMigrationStatus({ loading: false, error: null });
-    } catch (e) { 
-      setMigrationStatus({ loading: false, error: e.message }); 
-      showToast(e.message, "error");
-    }
+      const formattedId = newOrgForm.id.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      const admins = newOrgForm.adminEmail ? [newOrgForm.adminEmail] : [];
+      
+      await setDoc(doc(db, 'organizations', formattedId), { name: newOrgForm.name, admins });
+      
+      showToast("Studio Created Successfully!", "success");
+      setIsCreatingOrg(false);
+      setNewOrgForm({ id: '', name: '', adminEmail: '' });
+      
+      // Instantly switch the app to the new studio
+      if (setOrgId) setOrgId(formattedId); 
+    } catch (e) { showToast(e.message, "error"); }
   };
 
+  const handleUpdateOrgAdmins = async (newAdmins) => {
+    try {
+      await updateDoc(doc(db, 'organizations', orgId), { admins: newAdmins });
+      setOrgData({ ...orgData, admins: newAdmins });
+      showToast("Studio admins updated", "success");
+    } catch (e) { showToast(e.message, "error"); }
+  };
+
+  // --- SHOW MANAGEMENT FUNCTIONS ---
   const handleSave = async () => {
     if (!editData) return;
     try {
@@ -76,12 +101,31 @@ export default function AdminDashboard({ recitalData, isAuthorized, setRecitalDa
       }));
       const dataToSave = { ...editData, acts: cleanedActs };
       const cleanJson = JSON.parse(JSON.stringify(dataToSave, (k, v) => v === undefined ? null : v));
-      await setDoc(doc(db, "program_data", editData.id), cleanJson);
+      
+      await setDoc(doc(db, `organizations/${orgId}/shows`, editData.id), cleanJson);
       setRecitalData(prev => ({ ...prev, [editData.id]: dataToSave }));
       
       showToast("Changes saved to Firestore", "success");
-    } catch (err) { 
-      showToast(err.message, "error"); 
+    } catch (err) { showToast(err.message, "error"); }
+  };
+
+  const runMigration = async () => {
+    setMigrationStatus({ loading: true, error: null });
+    try {
+      const mockData = generateMockData();
+      const newRecitalData = {};
+      for (const key of Object.keys(mockData)) {
+        const show = mockData[key];
+        const clean = JSON.parse(JSON.stringify(show, (k, v) => v === undefined ? null : v));
+        await setDoc(doc(db, `organizations/${orgId}/shows`, show.id), clean);
+        newRecitalData[show.id] = clean;
+      }
+      setRecitalData(newRecitalData);
+      showToast("Mock Data Synchronized!", "success");
+      setMigrationStatus({ loading: false, error: null });
+    } catch (e) { 
+      setMigrationStatus({ loading: false, error: e.message }); 
+      showToast(e.message, "error");
     }
   };
 
@@ -103,9 +147,8 @@ export default function AdminDashboard({ recitalData, isAuthorized, setRecitalDa
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 relative">
+    <div className="space-y-8 animate-in fade-in duration-500 relative pb-20">
       
-      {/* Toast Notification UI */}
       {toast && (
         <div className={clsx(
           "fixed bottom-28 md:bottom-10 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl font-bold text-sm transition-all animate-in slide-in-from-bottom-5 fade-in",
@@ -116,36 +159,86 @@ export default function AdminDashboard({ recitalData, isAuthorized, setRecitalDa
         </div>
       )}
 
+      {/* --- SUPER ADMIN PANEL: ORG MANAGEMENT --- */}
+      {isSuperAdmin && (
+        <div className="bg-slate-50 dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden">
+          <Building2 size={120} className="absolute -right-10 -top-10 text-slate-200 dark:text-slate-800 opacity-50 pointer-events-none" />
+          
+          <div className="relative z-10">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+              <div>
+                <h3 className="text-[10px] font-black uppercase text-pink-600 dark:text-pink-500 tracking-[0.2em] mb-1">Global Organization Settings</h3>
+                <h4 className="text-2xl font-black dark:text-white">{orgData.name || orgId}</h4>
+              </div>
+              <button
+                onClick={() => setIsCreatingOrg(!isCreatingOrg)}
+                className="px-5 py-2.5 bg-pink-600 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-transform active:scale-95 shadow-lg shadow-pink-500/30"
+              >
+                {isCreatingOrg ? "Cancel" : "+ Create New Studio"}
+              </button>
+            </div>
+
+            {isCreatingOrg ? (
+              <div className="space-y-4 animate-in zoom-in duration-300 bg-white dark:bg-slate-800 p-6 rounded-2xl border border-pink-200 dark:border-pink-900">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1 mb-1 block">Studio Display Name</label>
+                  <input type="text" placeholder="e.g. Center Stage Academy" className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-xl dark:text-white border-none font-bold outline-none focus:ring-2 focus:ring-pink-500" value={newOrgForm.name} onChange={e => setNewOrgForm({...newOrgForm, name: e.target.value})} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1 mb-1 block">Database ID</label>
+                    <input type="text" placeholder="center-stage-26" className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-xl dark:text-white border-none font-bold outline-none focus:ring-2 focus:ring-pink-500 lowercase" value={newOrgForm.id} onChange={e => setNewOrgForm({...newOrgForm, id: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-')})} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1 mb-1 block">Owner Email</label>
+                    <input type="email" placeholder="owner@studio.com" className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-xl dark:text-white border-none font-bold outline-none focus:ring-2 focus:ring-pink-500" value={newOrgForm.adminEmail} onChange={e => setNewOrgForm({...newOrgForm, adminEmail: e.target.value})} />
+                  </div>
+                </div>
+                <button onClick={handleCreateOrg} className="w-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 p-4 rounded-xl font-black active:scale-95 transition-transform mt-2">
+                  Initialize Studio
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3 max-w-2xl">
+                <div className="flex items-center gap-2 px-1">
+                  <Shield size={16} className="text-slate-400" />
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Studio Administrators</label>
+                </div>
+                {(orgData.admins || []).map(email => (
+                  <div key={email} className="flex justify-between items-center bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                    <span className="text-sm font-bold dark:text-white ml-2">{email}</span>
+                    <button onClick={() => handleUpdateOrgAdmins((orgData.admins || []).filter(e => e !== email))} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-lg transition-colors">
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex gap-2 mt-2">
+                  <input type="email" placeholder="Add teacher@studio.com" className="flex-1 bg-white dark:bg-slate-800 p-3 rounded-xl dark:text-white border border-slate-200 dark:border-slate-700 outline-none focus:border-pink-500 text-sm shadow-sm" value={newOrgAdminEmail} onChange={e => setNewOrgAdminEmail(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newOrgAdminEmail.trim()) { handleUpdateOrgAdmins([...(orgData.admins || []), newOrgAdminEmail.trim()]); setNewOrgAdminEmail(''); }}} />
+                  <button onClick={() => { if (newOrgAdminEmail.trim()) { handleUpdateOrgAdmins([...(orgData.admins || []), newOrgAdminEmail.trim()]); setNewOrgAdminEmail(''); }}} className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white px-5 rounded-xl font-bold text-sm hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">
+                    Add
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* --- SHOW MANAGEMENT --- */}
       <div className="flex justify-between items-center px-1">
-        <h2 className="text-3xl font-black dark:text-white">Admin Console</h2>
+        <h2 className="text-3xl font-black dark:text-white">Performances</h2>
         <div className="flex gap-3">
           <button onClick={() => setIsAddingShow(!isAddingShow)} className="p-3 rounded-2xl bg-pink-100 dark:bg-pink-900/30 text-pink-600 transition-transform active:scale-95">
             {isAddingShow ? <X size={24} /> : <Plus size={24} />}
           </button>
           {editData && !isAddingShow && (
             <button onClick={handleSave} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">
-              <Save size={20} /> Save Changes
+              <Save size={20} /> Save
             </button>
           )}
         </div>
       </div>
 
-      {/* Cloud Migration Status */}
-      <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/50 p-5 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-xl text-amber-600"><Database size={20} /></div>
-          <div>
-            <p className="text-xs font-black uppercase text-amber-800 dark:text-amber-200 tracking-widest">Database Sync</p>
-            <p className="text-[10px] text-amber-600/70">Sync local cache with Firestore</p>
-          </div>
-        </div>
-        <button onClick={runMigration} disabled={migrationStatus.loading} className="w-full sm:w-auto text-xs font-black bg-amber-600 text-white px-6 py-2.5 rounded-xl hover:bg-amber-700 transition-colors">
-          {migrationStatus.loading ? "Syncing..." : "Run Migration"}
-        </button>
-      </div>
-
-      {/* ... (Rest of the component remains exactly the same, starting from isAddingShow ternary) ... */}
-      
       {isAddingShow ? (
         <div className="bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] shadow-xl border-2 border-pink-500 animate-in zoom-in duration-300">
           <h3 className="text-xs font-black text-slate-400 uppercase mb-6 tracking-[0.2em]">New Performance Details</h3>
@@ -165,16 +258,13 @@ export default function AdminDashboard({ recitalData, isAuthorized, setRecitalDa
           </div>
           <button onClick={() => {
             const { date, time, label } = newShowForm;
-            if (!date || !time || !label) {
-                showToast("Please fill out all fields", "error");
-                return;
-            }
+            if (!date || !time || !label) return showToast("Please fill out all fields", "error");
             const id = new Date(`${date}T${time}`).toISOString();
             setRecitalData(prev => ({ ...prev, [id]: { id, label, acts: [] } }));
             setSelectedShowId(id);
             setIsAddingShow(false);
             showToast("Performance Created", "success");
-          }} className="w-full bg-pink-600 text-white p-5 rounded-2xl font-black mt-8 shadow-lg shadow-pink-500/30">
+          }} className="w-full bg-pink-600 text-white p-5 rounded-2xl font-black mt-8 shadow-lg shadow-pink-500/30 active:scale-95 transition-transform">
             Create Performance
           </button>
         </div>
@@ -188,26 +278,40 @@ export default function AdminDashboard({ recitalData, isAuthorized, setRecitalDa
             </select>
             {editData && (
               <button onClick={async () => {
-                // Kept window.confirm here as it's a destructive action, but swapped the success alert to a toast.
-                if(window.confirm("Are you sure you want to delete this entire show? This cannot be undone.")) {
+                if(window.confirm("Delete this entire show? This cannot be undone.")) {
                   try {
-                      await deleteDoc(doc(db, "program_data", selectedShowId));
+                      await deleteDoc(doc(db, `organizations/${orgId}/shows`, selectedShowId));
                       const up = {...recitalData}; delete up[selectedShowId]; setRecitalData(up); setSelectedShowId('');
-                      showToast("Show deleted successfully", "success");
-                  } catch (err) {
-                      showToast(err.message, "error");
-                  }
+                      showToast("Show deleted", "success");
+                  } catch (err) { showToast(err.message, "error"); }
                 }
               }} className="p-4 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-2xl hover:bg-red-100 transition-colors">
-                <Trash size={24} />
+                <Trash2 size={24} />
               </button>
             )}
           </div>
         </div>
       )}
 
+      {/* Cloud Migration Status (SuperAdmin Only) */}
+      {isSuperAdmin && !editData && !isAddingShow && (
+        <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/50 p-5 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-xl text-amber-600"><Database size={20} /></div>
+            <div>
+              <p className="text-xs font-black uppercase text-amber-800 dark:text-amber-200 tracking-widest">Database Sync</p>
+              <p className="text-[10px] text-amber-600/70">Inject mock data into this studio</p>
+            </div>
+          </div>
+          <button onClick={runMigration} disabled={migrationStatus.loading} className="w-full sm:w-auto text-xs font-black bg-amber-600 text-white px-6 py-2.5 rounded-xl hover:bg-amber-700 transition-colors">
+            {migrationStatus.loading ? "Syncing..." : "Inject Mock Data"}
+          </button>
+        </div>
+      )}
+
+      {/* --- ACT EDITOR --- */}
       {editData && (
-        <div className="space-y-6">
+        <div className="space-y-6 pt-6 border-t border-slate-200 dark:border-slate-700">
           <div className="flex justify-between items-center px-1">
             <h3 className="font-black text-slate-400 uppercase text-[10px] tracking-widest">Act List ({editData.acts.length})</h3>
             <button onClick={() => setEditData({...editData, acts: [...editData.acts, { number: editData.acts.length+1, title: "", performers: [] }]})} className="text-pink-600 text-[10px] font-black bg-pink-50 dark:bg-pink-900/20 px-5 py-2.5 rounded-xl uppercase tracking-tighter">Add Act</button>
@@ -237,6 +341,7 @@ export default function AdminDashboard({ recitalData, isAuthorized, setRecitalDa
   );
 }
 
+// ... (SortableActCard remains exactly the same below) ...
 function SortableActCard({ act, idx, updateAct, onRemove }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: act.number });
   const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : 1, opacity: isDragging ? 0.6 : 1 };

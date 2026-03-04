@@ -1,29 +1,30 @@
 import { useState, useEffect } from 'react';
-import { 
-  doc, 
-  onSnapshot, 
-  setDoc, 
-  collection 
-} from "firebase/firestore";
+import { doc, onSnapshot, setDoc, collection } from "firebase/firestore";
 import { db } from '../firebase';
 
-export function useLiveTracker(selectedShowId) {
+export function useLiveTracker(orgId, selectedShowId) {
   const [recitalData, setRecitalData] = useState(null);
   const [currentAct, setCurrentAct] = useState({ number: null, title: '', isTracking: false });
   const [loading, setLoading] = useState(true);
 
-  // 1. Listen for ALL Program Data in Firestore
+  // 1. Listen for ALL Program Data in the specific Organization
   useEffect(() => {
-    const programRef = collection(db, "program_data");
+    // Safety check: Don't fetch if no org is selected
+    if (!orgId) {
+      setRecitalData(null);
+      setLoading(false);
+      return;
+    }
+
+    const programRef = collection(db, `organizations/${orgId}/shows`);
     
-    // This listener stays active and updates the UI if you change acts in Admin
     const unsubscribe = onSnapshot(programRef, (querySnapshot) => {
       const data = {};
       querySnapshot.forEach((doc) => {
         data[doc.id] = doc.data();
       });
       
-      console.log("Program Data Loaded from Firestore:", Object.keys(data));
+      console.log(`Program Data Loaded for Org [${orgId}]:`, Object.keys(data));
       setRecitalData(data);
       setLoading(false);
     }, (err) => {
@@ -32,17 +33,16 @@ export function useLiveTracker(selectedShowId) {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [orgId]);
 
-  // 2. Listen for "Now Performing" status
+  // 2. Listen for "Now Performing" status for the specific show
   useEffect(() => {
-    // CRITICAL FIX: Don't run if no show is selected OR if recitalData isn't loaded yet
-    if (!selectedShowId || !recitalData || !recitalData[selectedShowId]) {
+    if (!orgId || !selectedShowId || !recitalData || !recitalData[selectedShowId]) {
       setCurrentAct({ number: null, title: '', isTracking: false });
       return;
     }
 
-    const statusRef = doc(db, `artifacts/dancers-pointe-app/public/data/show_status`, selectedShowId);
+    const statusRef = doc(db, `organizations/${orgId}/status`, selectedShowId);
     
     const unsubscribe = onSnapshot(statusRef, (docSnap) => {
       if (!docSnap.exists()) {
@@ -62,18 +62,18 @@ export function useLiveTracker(selectedShowId) {
     });
 
     return () => unsubscribe();
-  }, [selectedShowId, recitalData]); // Re-run when recitalData arrives
+  }, [orgId, selectedShowId, recitalData]);
 
   // --- Persistence Actions ---
   const updateActNumber = async (num) => {
-    if (!selectedShowId) return;
-    const docRef = doc(db, `artifacts/dancers-pointe-app/public/data/show_status`, selectedShowId);
+    if (!orgId || !selectedShowId) return;
+    const docRef = doc(db, `organizations/${orgId}/status`, selectedShowId);
     await setDoc(docRef, { currentActNumber: num, isTracking: true }, { merge: true });
   };
 
   const toggleTracking = async () => {
-    if (!selectedShowId) return;
-    const docRef = doc(db, `artifacts/dancers-pointe-app/public/data/show_status`, selectedShowId);
+    if (!orgId || !selectedShowId) return;
+    const docRef = doc(db, `organizations/${orgId}/status`, selectedShowId);
     await setDoc(docRef, { isTracking: !currentAct.isTracking }, { merge: true });
   };
 

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Sun, Moon, Monitor, LogOut, Info, ChevronRight, User } from 'lucide-react';
+import { Sun, Moon, Monitor, LogOut, Info, ChevronRight, User, Building2 } from 'lucide-react';
 import { marked } from 'marked';
 import { auth, googleProvider } from '../firebase';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { clsx } from 'clsx';
 
-export default function SettingsView({ user }) {
-  // Internal theme state to keep it separate from the program logic
+// Make sure setOrgId is passed in as a prop!
+export default function SettingsView({ user, setOrgId }) {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
   const [changelog, setChangelog] = useState('');
   const [showLog, setShowLog] = useState(false);
@@ -35,28 +35,33 @@ export default function SettingsView({ user }) {
     <div className="space-y-6 pb-20 animate-in fade-in duration-500">
       <h2 className="text-2xl font-black dark:text-white px-1">Settings</h2>
 
+      {/* Organization Section */}
+      <section className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+        <h3 className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest">Organization</h3>
+        <button 
+          onClick={() => {
+            if(window.confirm("Are you sure you want to switch studios? This will clear your currently selected show.")) {
+              // This triggers App.jsx to drop back to the landing page
+              if (setOrgId) setOrgId(null);
+            }
+          }}
+          className="w-full p-4 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-xl font-bold flex items-center justify-between border border-slate-200 dark:border-slate-700 hover:border-pink-500 transition-colors active:scale-95"
+        >
+          <div className="flex items-center gap-3">
+             <Building2 size={18} className="text-pink-600" />
+             <span>Switch Studio</span>
+          </div>
+          <ChevronRight size={18} className="text-slate-400" />
+        </button>
+      </section>
+
       {/* Appearance Section */}
       <section className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
         <h3 className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest">Appearance</h3>
         <div className="grid grid-cols-3 gap-3">
-          <ThemeOption 
-            active={theme === 'light'} 
-            onClick={() => setTheme('light')} 
-            icon={<Sun size={20}/>} 
-            label="Light" 
-          />
-          <ThemeOption 
-            active={theme === 'dark'} 
-            onClick={() => setTheme('dark')} 
-            icon={<Moon size={20}/>} 
-            label="Dark" 
-          />
-          <ThemeOption 
-            active={theme === 'system'} 
-            onClick={() => setTheme('system')} 
-            icon={<Monitor size={20}/>} 
-            label="System" 
-          />
+          <ThemeOption active={theme === 'light'} onClick={() => setTheme('light')} icon={<Sun size={20}/>} label="Light" />
+          <ThemeOption active={theme === 'dark'} onClick={() => setTheme('dark')} icon={<Moon size={20}/>} label="Dark" />
+          <ThemeOption active={theme === 'system'} onClick={() => setTheme('system')} icon={<Monitor size={20}/>} label="System" />
         </div>
       </section>
 

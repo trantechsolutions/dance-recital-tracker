@@ -7,7 +7,7 @@ import { clsx } from 'clsx';
 // Icons
 import { 
   List, Search, Users, Settings, ShieldAlert, 
-  Calendar, ChevronRight 
+  Calendar, Building2, LogOut
 } from 'lucide-react';
 
 // Components
@@ -19,13 +19,18 @@ import AdminDashboard from './components/admin/AdminDashboard';
 import StickyHeader from './components/ui/StickyHeader';
 import NavButton from './components/ui/NavButton';
 import LiveTrackerHero from './components/program/LiveTrackerHero';
+import StudioSelector from './components/StudioSelector'; // Make sure you have this file!
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('program');
   const [selectedShow, setSelectedShow] = useState('');
   const [user, setUser] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [favorites, setFavorites] = useState(new Set());
+  
+  // Organization state synced with localStorage
+  const [orgId, setOrgId] = useState(() => localStorage.getItem('selectedOrgId') || null);
 
   const { 
     recitalData, 
@@ -34,12 +39,16 @@ export default function App() {
     setRecitalData, 
     updateActNumber, 
     toggleTracking 
-  } = useLiveTracker(selectedShow);
+  } = useLiveTracker(orgId, selectedShow); // Pass orgId here!
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      setIsAuthorized(u && authorizedUsers.includes(u.email));
+      const isSuper = u && authorizedUsers.includes(u.email);
+      setIsSuperAdmin(isSuper);
+      // Temporarily, we will set authorized if they are superadmin. 
+      // If you are using OrgAdmins, you'll need to fetch the org document to check the admins array.
+      setIsAuthorized(isSuper); 
     });
     return unsubscribe;
   }, []);
@@ -60,7 +69,6 @@ export default function App() {
     };
     applyTheme(savedTheme);
 
-    // Optional: Listen for system theme changes if set to 'system'
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
       if (localStorage.getItem('theme') === 'system' || !localStorage.getItem('theme')) {
@@ -72,6 +80,16 @@ export default function App() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
+  // Sync orgId to localStorage
+  useEffect(() => {
+    if (orgId) {
+      localStorage.setItem('selectedOrgId', orgId);
+    } else {
+      localStorage.removeItem('selectedOrgId');
+      setSelectedShow(''); 
+    }
+  }, [orgId]);
+
   const toggleFavorite = (name) => {
     setFavorites(prev => {
       const next = new Set(prev);
@@ -81,6 +99,11 @@ export default function App() {
       return next;
     });
   };
+
+  // If no organization is selected, show the landing page
+  if (!orgId) {
+    return <StudioSelector onSelect={setOrgId} />;
+  }
 
   if (loading) return (
     <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
@@ -102,8 +125,8 @@ export default function App() {
       case 'program': return <ProgramView {...props} />;
       case 'searchActs': return <SearchActView {...props} />;
       case 'searchDancers': return <SearchDancerView {...props} />;
-      case 'admin': return <AdminDashboard recitalData={recitalData} isAuthorized={isAuthorized} setRecitalData={setRecitalData} />;
-      case 'settings': return <SettingsView user={user} />;
+      case 'admin': return <AdminDashboard recitalData={recitalData} user={user} isSuperAdmin={isSuperAdmin} setRecitalData={setRecitalData} orgId={orgId} setOrgId={setOrgId} />;
+      case 'settings': return <SettingsView user={user} setOrgId={setOrgId} />;
       default: return <ProgramView {...props} />;
     }
   };
@@ -113,10 +136,20 @@ export default function App() {
       
       {/* --- DESKTOP SIDEBAR --- */}
       <nav className="hidden md:flex md:w-72 md:flex-col md:fixed md:h-full bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-8 z-50">
-        <div className="mb-12">
-          <h1 className="text-3xl font-black text-pink-600 tracking-tighter leading-none">Dancer Recital</h1>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-3">Tracker</p>
+        <div className="mb-8">
+          <h1 className="text-3xl font-black text-pink-600 tracking-tighter leading-none capitalize">
+            {orgId ? orgId.replace(/-/g, ' ') : "Studio"}
+          </h1>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-3">Recital Portal</p>
         </div>
+
+        {/* Desktop Switch Studio Button */}
+        <button 
+          onClick={() => setOrgId(null)}
+          className="mb-8 flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-pink-600 transition-colors bg-slate-100 dark:bg-slate-900 px-4 py-2 rounded-xl"
+        >
+          <Building2 size={14} /> Switch Studio
+        </button>
         
         <div className="space-y-2 flex-1">
           <SidebarLink active={activeTab === 'program'} onClick={() => setActiveTab('program')} icon={<List size={20}/>} label="Program View" />
@@ -135,8 +168,17 @@ export default function App() {
         <StickyHeader currentAct={currentAct} isAuthorized={isAuthorized} onUpdate={updateActNumber} />
         
         <div className="max-w-4xl mx-auto px-4 md:px-12 pt-8">
-          <header className="md:hidden text-center mb-8">
-            <h1 className="text-4xl font-black text-pink-600 tracking-tight">Dancer's Pointe</h1>
+          <header className="md:hidden flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-black text-pink-600 tracking-tight capitalize truncate pr-4">
+              {orgId ? orgId.replace(/-/g, ' ') : "Studio"}
+            </h1>
+            <button 
+              onClick={() => setOrgId(null)}
+              className="p-2 bg-slate-200 dark:bg-slate-800 rounded-full text-slate-500 hover:text-pink-600 transition-colors"
+              title="Switch Studio"
+            >
+              <LogOut size={20} className="rotate-180" />
+            </button>
           </header>
 
           {/* Responsive Show Selector */}
@@ -153,11 +195,13 @@ export default function App() {
                       value={selectedShow}
                       onChange={e => setSelectedShow(e.target.value)}
                     >
-                      <option value="" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">-- Choose Show --</option>
+                      <option value="" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                        -- Choose Show --
+                      </option>
                       {recitalData && Object.keys(recitalData).map(k => (
                         <option 
                           key={k} 
-                          value={k} 
+                          value={k}
                           className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                         >
                           {recitalData[k].label}

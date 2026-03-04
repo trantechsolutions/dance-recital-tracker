@@ -43,7 +43,7 @@ export default function ActCard({ act, isCurrent, toggleFavorite, favorites }) {
       </div>
       
       {act.performers?.length > 0 && (
-        <p className="mt-auto pt-3 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+        <p className="pt-3 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
           <span className="font-semibold">Performers:</span>{' '}
           {act.performers.map((p, i) => {
             const isDancerFav = favorites?.has(p);
