@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Search as SearchIcon } from 'lucide-react';
+import { Search as SearchIcon, Cloud } from 'lucide-react';
 import ActCard from '../program/ActCard';
 
-export default function SearchActView({ showData, favorites, currentAct, toggleFavorite }) {
+export default function SearchActView({ showData, favorites, currentAct, toggleFavorite, user }) {
   const [query, setQuery] = useState('');
 
   // 1. Hook for Search Results
@@ -74,9 +74,16 @@ export default function SearchActView({ showData, favorites, currentAct, toggleF
           <>
             {favoriteActs.length > 0 ? (
               <div className="space-y-4">
-                <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">
-                  Your Favorited Acts
-                </h3>
+                <div className="flex items-center justify-between px-1 mb-2">
+                  <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                    Your Favorited Acts
+                  </h3>
+                  {user && (
+                    <div className="flex items-center gap-1 text-[9px] font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-md" title="Synced to cloud">
+                      <Cloud size={12} /> Synced
+                    </div>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {favoriteActs.map(act => (
                     <ActCard 

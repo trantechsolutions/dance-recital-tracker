@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, authorizedUsers } from './firebase'; 
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db, authorizedUsers, DB_PREFIX } from './firebase'; 
 import { useLiveTracker } from './hooks/useLiveTracker';
 import { clsx } from 'clsx';
 
@@ -19,7 +20,8 @@ import AdminDashboard from './components/admin/AdminDashboard';
 import StickyHeader from './components/ui/StickyHeader';
 import NavButton from './components/ui/NavButton';
 import LiveTrackerHero from './components/program/LiveTrackerHero';
-import StudioSelector from './components/StudioSelector'; // Make sure you have this file!
+import StudioSelector from './components/StudioSelector';
+import LoginScreen from './components/LoginScreen';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('program');
@@ -28,6 +30,8 @@ export default function App() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [favorites, setFavorites] = useState(new Set());
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [hasSkippedLogin, setHasSkippedLogin] = useState(() => localStorage.getItem('hasSkippedLogin') === 'true');
   
   // Organization state synced with localStorage
   const [orgId, setOrgId] = useState(() => localStorage.getItem('selectedOrgId') || null);
@@ -39,28 +43,9 @@ export default function App() {
     setRecitalData, 
     updateActNumber, 
     toggleTracking 
-  } = useLiveTracker(orgId, selectedShow); // Pass orgId here!
+  } = useLiveTracker(orgId, selectedShow);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      const isSuper = u && authorizedUsers.includes(u.email);
-      setIsSuperAdmin(isSuper);
-      // Temporarily, we will set authorized if they are superadmin. 
-      // If you are using OrgAdmins, you'll need to fetch the org document to check the admins array.
-      setIsAuthorized(isSuper); 
-    });
-    return unsubscribe;
-  }, []);
-
-  useEffect(() => {
-    const stored = localStorage.getItem('favorites');
-    if (stored) {
-      try { setFavorites(new Set(JSON.parse(stored))); } 
-      catch (e) { console.error("Favorites parse error", e); }
-    }
-  }, []);
-
+  // Restore Theme on Load
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'system';
     const applyTheme = (t) => {
@@ -80,6 +65,41 @@ export default function App() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
+  // Strict Cloud-Only Authentication & Favorites Sync
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      const isSuper = u && authorizedUsers.includes(u.email);
+      setIsSuperAdmin(isSuper);
+      setIsAuthorized(isSuper);
+
+      if (u) {
+        // User logged in! Fetch their cloud favorites
+        const userRef = doc(db, `${DB_PREFIX}users`, u.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists() && userSnap.data().favorites) {
+          setFavorites(new Set(userSnap.data().favorites));
+        } else {
+          setFavorites(new Set()); 
+        }
+
+        // NEW: Save their email and last login time so the Admin Dashboard can see it!
+        setDoc(userRef, { 
+          email: u.email,
+          lastLogin: new Date().toISOString()
+        }, { merge: true }).catch(err => console.error("Error saving user profile", err));
+
+      } else {
+        setFavorites(new Set());
+      }
+      
+      // NEW: Tell the app we are done checking auth
+      setIsAuthChecking(false);
+    });
+    return unsubscribe;
+  }, []);
+
   // Sync orgId to localStorage
   useEffect(() => {
     if (orgId) {
@@ -90,21 +110,71 @@ export default function App() {
     }
   }, [orgId]);
 
-  const toggleFavorite = (name) => {
+  const toggleFavorite = async (name) => {
+    if (!user) {
+      alert("Please create an account or sign in from the Setup tab to save favorites!");
+      setActiveTab('settings'); // Automatically route them to the settings tab to log in
+      return;
+    }
+
     setFavorites(prev => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
       else next.add(name);
-      localStorage.setItem('favorites', JSON.stringify(Array.from(next)));
+      
+      const newFavArray = Array.from(next);
+      
+      // Sync directly to Firestore, no localStorage fallback
+      const userRef = doc(db, `${DB_PREFIX}users`, user.uid);
+      setDoc(userRef, { favorites: newFavArray }, { merge: true })
+        .catch(err => console.error("Failed to sync favorites:", err));
+
       return next;
     });
   };
 
-  // If no organization is selected, show the landing page
-  if (!orgId) {
-    return <StudioSelector onSelect={setOrgId} />;
+  // 1. Show global loading state while Firebase checks authentication
+  if (isAuthChecking) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin"></div>
+          <div className="text-pink-600 font-bold animate-pulse tracking-widest uppercase text-[10px]">Loading</div>
+        </div>
+      </div>
+    );
   }
 
+  // 2. Show Login Screen if they aren't logged in AND haven't clicked "Continue as Guest"
+  if (!user && !hasSkippedLogin) {
+    return (
+      <LoginScreen onSkip={() => {
+        setHasSkippedLogin(true);
+        localStorage.setItem('hasSkippedLogin', 'true');
+      }} />
+    );
+  }
+
+  // 3. Show Studio Selector if no organization is chosen yet
+  if (!orgId && !(isSuperAdmin && activeTab === 'admin')) {
+    return (
+      <div className="relative min-h-screen">
+        {isSuperAdmin && (
+          <div className="absolute top-4 right-4 md:top-8 md:right-8 z-50 animate-in fade-in zoom-in duration-500">
+            <button 
+              onClick={() => setActiveTab('admin')}
+              className="flex items-center gap-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-5 py-3 rounded-2xl font-black shadow-2xl hover:scale-105 transition-all"
+            >
+              <ShieldAlert size={20} /> Global Admin Setup
+            </button>
+          </div>
+        )}
+        <StudioSelector onSelect={setOrgId} />
+      </div>
+    );
+  }
+
+  // 4. Show loading state if the specific studio data is being fetched
   if (loading) return (
     <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
       <div className="flex flex-col items-center gap-4">
@@ -117,7 +187,7 @@ export default function App() {
   const renderContent = () => {
     const showData = selectedShow ? recitalData?.[selectedShow] : null;
     const props = { 
-      showData, currentAct, isAuthorized, favorites, toggleFavorite,
+      showData, currentAct, isAuthorized, favorites, toggleFavorite, user,
       onUpdate: updateActNumber, onToggle: toggleTracking 
     };
 
@@ -169,8 +239,8 @@ export default function App() {
         
         <div className="max-w-4xl mx-auto px-4 md:px-12 pt-8">
           <header className="md:hidden flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-black text-pink-600 tracking-tight capitalize truncate pr-4">
-              {orgId ? orgId.replace(/-/g, ' ') : "Studio"}
+            <h1 className="text-3xl font-black text-pink-600 tracking-tighter leading-none capitalize">
+              {orgId ? orgId.replace(/-/g, ' ') : "Global Admin"}
             </h1>
             <button 
               onClick={() => setOrgId(null)}
@@ -195,15 +265,9 @@ export default function App() {
                       value={selectedShow}
                       onChange={e => setSelectedShow(e.target.value)}
                     >
-                      <option value="" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
-                        -- Choose Show --
-                      </option>
+                      <option value="" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">-- Choose Show --</option>
                       {recitalData && Object.keys(recitalData).map(k => (
-                        <option 
-                          key={k} 
-                          value={k}
-                          className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                        >
+                        <option key={k} value={k} className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
                           {recitalData[k].label}
                         </option>
                       ))}

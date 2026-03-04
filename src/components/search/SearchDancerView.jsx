@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Star, Search as SearchIcon } from 'lucide-react';
+import { Star, Search as SearchIcon, Cloud } from 'lucide-react';
 import { clsx } from 'clsx';
 
-export default function SearchDancerView({ showData, favorites, toggleFavorite }) {
+export default function SearchDancerView({ showData, favorites, toggleFavorite, user }) {
   const [query, setQuery] = useState('');
 
   // 1. Hook for Search Results
@@ -105,9 +105,16 @@ export default function SearchDancerView({ showData, favorites, toggleFavorite }
           <>
             {favoriteDancers.length > 0 ? (
               <div className="space-y-4">
-                <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">
-                  Your Favorited Dancers
-                </h3>
+                <div className="flex items-center justify-between px-1 mb-2">
+                  <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                    Your Favorited Dancers
+                  </h3>
+                  {user && (
+                    <div className="flex items-center gap-1 text-[9px] font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-md" title="Synced to cloud">
+                      <Cloud size={12} /> Synced
+                    </div>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {favoriteDancers.map(res => <DancerCard key={res.name} res={res} />)}
                 </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, DB_PREFIX } from '../firebase';
 import { Building2, ChevronRight, Loader2 } from 'lucide-react';
 
 export default function StudioSelector({ onSelect }) {
@@ -10,7 +10,7 @@ export default function StudioSelector({ onSelect }) {
   useEffect(() => {
     const fetchOrganizations = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, 'organizations'));
+        const querySnapshot = await getDocs(collection(db, `${DB_PREFIX}organizations`));
         const orgList = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()

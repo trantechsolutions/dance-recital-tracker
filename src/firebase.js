@@ -17,3 +17,4 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 export const authorizedUsers = (import.meta.env.VITE_AUTHORIZED_ADMINS || "").split(',');
+export const DB_PREFIX = import.meta.env.DEV ? 'test_' : '';

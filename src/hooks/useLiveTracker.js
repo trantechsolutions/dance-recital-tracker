@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot, setDoc, collection } from "firebase/firestore";
-import { db } from '../firebase';
+import { db, DB_PREFIX } from '../firebase';
 
 export function useLiveTracker(orgId, selectedShowId) {
   const [recitalData, setRecitalData] = useState(null);
@@ -16,7 +16,7 @@ export function useLiveTracker(orgId, selectedShowId) {
       return;
     }
 
-    const programRef = collection(db, `organizations/${orgId}/shows`);
+    const programRef = collection(db, `${DB_PREFIX}organizations/${orgId}/shows`);
     
     const unsubscribe = onSnapshot(programRef, (querySnapshot) => {
       const data = {};
@@ -42,7 +42,7 @@ export function useLiveTracker(orgId, selectedShowId) {
       return;
     }
 
-    const statusRef = doc(db, `organizations/${orgId}/status`, selectedShowId);
+    const statusRef = doc(db, `${DB_PREFIX}organizations/${orgId}/status`, selectedShowId);
     
     const unsubscribe = onSnapshot(statusRef, (docSnap) => {
       if (!docSnap.exists()) {
@@ -67,13 +67,13 @@ export function useLiveTracker(orgId, selectedShowId) {
   // --- Persistence Actions ---
   const updateActNumber = async (num) => {
     if (!orgId || !selectedShowId) return;
-    const docRef = doc(db, `organizations/${orgId}/status`, selectedShowId);
+    const docRef = doc(db, `${DB_PREFIX}organizations/${orgId}/status`, selectedShowId);
     await setDoc(docRef, { currentActNumber: num, isTracking: true }, { merge: true });
   };
 
   const toggleTracking = async () => {
     if (!orgId || !selectedShowId) return;
-    const docRef = doc(db, `organizations/${orgId}/status`, selectedShowId);
+    const docRef = doc(db, `${DB_PREFIX}organizations/${orgId}/status`, selectedShowId);
     await setDoc(docRef, { isTracking: !currentAct.isTracking }, { merge: true });
   };
 

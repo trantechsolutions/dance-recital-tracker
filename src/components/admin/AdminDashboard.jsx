@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Save, Calendar, Users, Plus, Trash2, Database, 
-  AlertCircle, X, Check, GripVertical, Building2, Shield
+  AlertCircle, X, Check, GripVertical, Building2, Shield, User as UserIcon, RefreshCw, Settings
 } from 'lucide-react';
-import { doc, setDoc, deleteDoc, getDoc, updateDoc } from "firebase/firestore";
-import { db } from '../../firebase';
+import { doc, setDoc, deleteDoc, getDoc, updateDoc, collection, getDocs } from "firebase/firestore";
+import { db, DB_PREFIX } from '../../firebase';
 import { clsx } from 'clsx';
 import { generateMockData } from '../../utils/mockData';
 
@@ -35,23 +35,26 @@ export default function AdminDashboard({ recitalData, user, isSuperAdmin, setRec
   const [newShowForm, setNewShowForm] = useState({ date: '', time: '', label: '' });
   const [toast, setToast] = useState(null);
 
+  // Users Table State
+  const [appUsers, setAppUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [activeAdminTab, setActiveAdminTab] = useState(orgId ? 'shows' : 'studio');
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // Fetch the current Organization's top-level data
   useEffect(() => {
     const fetchOrg = async () => {
       if (!orgId) return;
-      const snap = await getDoc(doc(db, 'organizations', orgId));
+      const snap = await getDoc(doc(db, `${DB_PREFIX}organizations`, orgId));
       if (snap.exists()) setOrgData(snap.data());
     };
     fetchOrg();
   }, [orgId]);
 
-  // Sync selected show data for editing
   useEffect(() => {
     if (selectedShowId && recitalData?.[selectedShowId]) {
       setEditData(JSON.parse(JSON.stringify(recitalData[selectedShowId])));
@@ -65,31 +68,52 @@ export default function AdminDashboard({ recitalData, user, isSuperAdmin, setRec
     setTimeout(() => setToast(null), 3000);
   };
 
-  // --- ORG MANAGEMENT FUNCTIONS ---
+  // --- ORG MANAGEMENT FUNCTIONS (RESTORED) ---
   const handleCreateOrg = async () => {
     if (!newOrgForm.id || !newOrgForm.name) return showToast("ID and Name required", "error");
     try {
       const formattedId = newOrgForm.id.toLowerCase().replace(/[^a-z0-9-]/g, '-');
       const admins = newOrgForm.adminEmail ? [newOrgForm.adminEmail] : [];
       
-      await setDoc(doc(db, 'organizations', formattedId), { name: newOrgForm.name, admins });
+      await setDoc(doc(db, `${DB_PREFIX}organizations`, formattedId), { name: newOrgForm.name, admins });
       
       showToast("Studio Created Successfully!", "success");
       setIsCreatingOrg(false);
       setNewOrgForm({ id: '', name: '', adminEmail: '' });
       
-      // Instantly switch the app to the new studio
       if (setOrgId) setOrgId(formattedId); 
     } catch (e) { showToast(e.message, "error"); }
   };
 
   const handleUpdateOrgAdmins = async (newAdmins) => {
     try {
-      await updateDoc(doc(db, 'organizations', orgId), { admins: newAdmins });
+      await updateDoc(doc(db, `${DB_PREFIX}organizations`, orgId), { admins: newAdmins });
       setOrgData({ ...orgData, admins: newAdmins });
       showToast("Studio admins updated", "success");
     } catch (e) { showToast(e.message, "error"); }
   };
+
+  // --- FETCH ALL USERS ---
+  const fetchAppUsers = async () => {
+    if (!isSuperAdmin) return;
+    setLoadingUsers(true);
+    try {
+      const snap = await getDocs(collection(db, `${DB_PREFIX}users`));
+      const usersList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      usersList.sort((a, b) => new Date(b.lastLogin || 0) - new Date(a.lastLogin || 0));
+      setAppUsers(usersList);
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeAdminTab === 'users' && appUsers.length === 0) {
+      fetchAppUsers();
+    }
+  }, [activeAdminTab]);
 
   // --- SHOW MANAGEMENT FUNCTIONS ---
   const handleSave = async () => {
@@ -102,7 +126,7 @@ export default function AdminDashboard({ recitalData, user, isSuperAdmin, setRec
       const dataToSave = { ...editData, acts: cleanedActs };
       const cleanJson = JSON.parse(JSON.stringify(dataToSave, (k, v) => v === undefined ? null : v));
       
-      await setDoc(doc(db, `organizations/${orgId}/shows`, editData.id), cleanJson);
+      await setDoc(doc(db, `${DB_PREFIX}organizations/${orgId}/shows`, editData.id), cleanJson);
       setRecitalData(prev => ({ ...prev, [editData.id]: dataToSave }));
       
       showToast("Changes saved to Firestore", "success");
@@ -117,7 +141,7 @@ export default function AdminDashboard({ recitalData, user, isSuperAdmin, setRec
       for (const key of Object.keys(mockData)) {
         const show = mockData[key];
         const clean = JSON.parse(JSON.stringify(show, (k, v) => v === undefined ? null : v));
-        await setDoc(doc(db, `organizations/${orgId}/shows`, show.id), clean);
+        await setDoc(doc(db, `${DB_PREFIX}organizations/${orgId}/shows`, show.id), clean);
         newRecitalData[show.id] = clean;
       }
       setRecitalData(newRecitalData);
@@ -159,9 +183,24 @@ export default function AdminDashboard({ recitalData, user, isSuperAdmin, setRec
         </div>
       )}
 
-      {/* --- SUPER ADMIN PANEL: ORG MANAGEMENT --- */}
+      {/* --- SUPER ADMIN NAVIGATION --- */}
       {isSuperAdmin && (
-        <div className="bg-slate-50 dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden">
+        <div className="flex gap-2 p-1 bg-slate-200 dark:bg-slate-800 rounded-2xl overflow-x-auto hide-scrollbar">
+          <button onClick={() => setActiveAdminTab('shows')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm whitespace-nowrap transition-all", activeAdminTab === 'shows' ? "bg-white dark:bg-slate-700 text-pink-600 shadow-sm" : "text-slate-500 hover:text-slate-800 dark:hover:text-white")}>
+            <Calendar size={18} /> Manage Shows
+          </button>
+          <button onClick={() => setActiveAdminTab('studio')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm whitespace-nowrap transition-all", activeAdminTab === 'studio' ? "bg-white dark:bg-slate-700 text-pink-600 shadow-sm" : "text-slate-500 hover:text-slate-800 dark:hover:text-white")}>
+            <Building2 size={18} /> Studio Settings
+          </button>
+          <button onClick={() => setActiveAdminTab('users')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm whitespace-nowrap transition-all", activeAdminTab === 'users' ? "bg-white dark:bg-slate-700 text-pink-600 shadow-sm" : "text-slate-500 hover:text-slate-800 dark:hover:text-white")}>
+            <UserIcon size={18} /> Registered Users
+          </button>
+        </div>
+      )}
+
+      {/* --- STUDIO SETTINGS TAB (RESTORED) --- */}
+      {activeAdminTab === 'studio' && isSuperAdmin && (
+        <div className="bg-slate-50 dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden animate-in fade-in">
           <Building2 size={120} className="absolute -right-10 -top-10 text-slate-200 dark:text-slate-800 opacity-50 pointer-events-none" />
           
           <div className="relative z-10">
@@ -224,124 +263,180 @@ export default function AdminDashboard({ recitalData, user, isSuperAdmin, setRec
         </div>
       )}
 
-      {/* --- SHOW MANAGEMENT --- */}
-      <div className="flex justify-between items-center px-1">
-        <h2 className="text-3xl font-black dark:text-white">Performances</h2>
-        <div className="flex gap-3">
-          <button onClick={() => setIsAddingShow(!isAddingShow)} className="p-3 rounded-2xl bg-pink-100 dark:bg-pink-900/30 text-pink-600 transition-transform active:scale-95">
-            {isAddingShow ? <X size={24} /> : <Plus size={24} />}
-          </button>
-          {editData && !isAddingShow && (
-            <button onClick={handleSave} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">
-              <Save size={20} /> Save
+      {/* --- USERS TAB --- */}
+      {activeAdminTab === 'users' && isSuperAdmin && (
+        <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden animate-in fade-in">
+          <div className="p-6 md:p-8 flex justify-between items-center border-b border-slate-100 dark:border-slate-700">
+            <div>
+              <h3 className="text-2xl font-black dark:text-white">User Directory</h3>
+              <p className="text-sm font-medium text-slate-400 mt-1">Total Registered Accounts: {appUsers.length}</p>
+            </div>
+            <button onClick={fetchAppUsers} className="p-3 bg-pink-50 dark:bg-pink-900/20 text-pink-600 rounded-xl hover:bg-pink-100 dark:hover:bg-pink-900/40 transition-colors">
+              <RefreshCw size={20} className={clsx(loadingUsers && "animate-spin")} />
             </button>
-          )}
-        </div>
-      </div>
-
-      {isAddingShow ? (
-        <div className="bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] shadow-xl border-2 border-pink-500 animate-in zoom-in duration-300">
-          <h3 className="text-xs font-black text-slate-400 uppercase mb-6 tracking-[0.2em]">New Performance Details</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="md:col-span-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Display Title</label>
-              <input type="text" placeholder="e.g. 2026 Spring Recital" className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl dark:text-white border-none mt-1 text-lg font-bold" value={newShowForm.label} onChange={e => setNewShowForm({...newShowForm, label: e.target.value})} />
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Date</label>
-              <input type="date" className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl dark:text-white border-none mt-1" value={newShowForm.date} onChange={e => setNewShowForm({...newShowForm, date: e.target.value})} />
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Time</label>
-              <input type="time" className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl dark:text-white border-none mt-1" value={newShowForm.time} onChange={e => setNewShowForm({...newShowForm, time: e.target.value})} />
-            </div>
           </div>
-          <button onClick={() => {
-            const { date, time, label } = newShowForm;
-            if (!date || !time || !label) return showToast("Please fill out all fields", "error");
-            const id = new Date(`${date}T${time}`).toISOString();
-            setRecitalData(prev => ({ ...prev, [id]: { id, label, acts: [] } }));
-            setSelectedShowId(id);
-            setIsAddingShow(false);
-            showToast("Performance Created", "success");
-          }} className="w-full bg-pink-600 text-white p-5 rounded-2xl font-black mt-8 shadow-lg shadow-pink-500/30 active:scale-95 transition-transform">
-            Create Performance
-          </button>
-        </div>
-      ) : (
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-[2rem] shadow-sm border border-slate-200 dark:border-slate-700">
-          <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 ml-1">Selected Show</label>
-          <div className="flex gap-4">
-            <select className="flex-1 bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl dark:text-white font-bold border-none appearance-none" value={selectedShowId} onChange={e => setSelectedShowId(e.target.value)}>
-              <option value="">-- Choose Show to Edit --</option>
-              {recitalData && Object.keys(recitalData).map(k => <option key={k} value={k}>{recitalData[k].label} ({new Date(k).toLocaleDateString()})</option>)}
-            </select>
-            {editData && (
-              <button onClick={async () => {
-                if(window.confirm("Delete this entire show? This cannot be undone.")) {
-                  try {
-                      await deleteDoc(doc(db, `organizations/${orgId}/shows`, selectedShowId));
-                      const up = {...recitalData}; delete up[selectedShowId]; setRecitalData(up); setSelectedShowId('');
-                      showToast("Show deleted", "success");
-                  } catch (err) { showToast(err.message, "error"); }
-                }
-              }} className="p-4 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-2xl hover:bg-red-100 transition-colors">
-                <Trash2 size={24} />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Cloud Migration Status (SuperAdmin Only) */}
-      {isSuperAdmin && !editData && !isAddingShow && (
-        <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/50 p-5 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-xl text-amber-600"><Database size={20} /></div>
-            <div>
-              <p className="text-xs font-black uppercase text-amber-800 dark:text-amber-200 tracking-widest">Database Sync</p>
-              <p className="text-[10px] text-amber-600/70">Inject mock data into this studio</p>
-            </div>
-          </div>
-          <button onClick={runMigration} disabled={migrationStatus.loading} className="w-full sm:w-auto text-xs font-black bg-amber-600 text-white px-6 py-2.5 rounded-xl hover:bg-amber-700 transition-colors">
-            {migrationStatus.loading ? "Syncing..." : "Inject Mock Data"}
-          </button>
-        </div>
-      )}
-
-      {/* --- ACT EDITOR --- */}
-      {editData && (
-        <div className="space-y-6 pt-6 border-t border-slate-200 dark:border-slate-700">
-          <div className="flex justify-between items-center px-1">
-            <h3 className="font-black text-slate-400 uppercase text-[10px] tracking-widest">Act List ({editData.acts.length})</h3>
-            <button onClick={() => setEditData({...editData, acts: [...editData.acts, { number: editData.acts.length+1, title: "", performers: [] }]})} className="text-pink-600 text-[10px] font-black bg-pink-50 dark:bg-pink-900/20 px-5 py-2.5 rounded-xl uppercase tracking-tighter">Add Act</button>
-          </div>
-
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={editData.acts.map(a => a.number)} strategy={verticalListSortingStrategy}>
-              <div className="space-y-4">
-                {editData.acts.map((act, idx) => (
-                  <SortableActCard 
-                    key={act.number} 
-                    act={act} 
-                    idx={idx} 
-                    updateAct={updateAct}
-                    onRemove={() => {
-                        setEditData({...editData, acts: editData.acts.filter((_, i) => i !== idx)});
-                        showToast(`Act #${act.number} removed`, "success");
-                    }}
-                  />
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-900/50">
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Account / Email</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Favorites Saved</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Last Login</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                {appUsers.map(appUser => (
+                  <tr key={appUser.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="font-bold dark:text-white">{appUser.email || "Anonymous Account"}</div>
+                      <div className="text-xs text-slate-400 font-mono mt-0.5">{appUser.id}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center justify-center bg-pink-100 dark:bg-pink-900/30 text-pink-600 font-black text-xs px-3 py-1 rounded-full">
+                        {appUser.favorites?.length || 0} Dancers
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right text-sm font-medium text-slate-500 dark:text-slate-400">
+                      {appUser.lastLogin ? new Date(appUser.lastLogin).toLocaleDateString() : "Unknown"}
+                    </td>
+                  </tr>
                 ))}
+                {appUsers.length === 0 && !loadingUsers && (
+                  <tr>
+                    <td colSpan="3" className="px-6 py-12 text-center text-slate-400 font-medium">
+                      No users have registered yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* --- SHOWS TAB --- */}
+      {activeAdminTab === 'shows' && (
+        <div className="space-y-8 animate-in fade-in">
+          <div className="flex justify-between items-center px-1">
+            <h2 className="text-3xl font-black dark:text-white">Performances</h2>
+            <div className="flex gap-3">
+              <button onClick={() => setIsAddingShow(!isAddingShow)} className="p-3 rounded-2xl bg-pink-100 dark:bg-pink-900/30 text-pink-600 transition-transform active:scale-95">
+                {isAddingShow ? <X size={24} /> : <Plus size={24} />}
+              </button>
+              {editData && !isAddingShow && (
+                <button onClick={handleSave} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all">
+                  <Save size={20} /> Save
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Cloud Migration Status (SuperAdmin Only) */}
+          {isSuperAdmin && !editData && !isAddingShow && (
+            <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/50 p-5 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-xl text-amber-600"><Database size={20} /></div>
+                <div>
+                  <p className="text-xs font-black uppercase text-amber-800 dark:text-amber-200 tracking-widest">Database Sync</p>
+                  <p className="text-[10px] text-amber-600/70">Inject mock data into this studio</p>
+                </div>
               </div>
-            </SortableContext>
-          </DndContext>
+              <button onClick={runMigration} disabled={migrationStatus.loading} className="w-full sm:w-auto text-xs font-black bg-amber-600 text-white px-6 py-2.5 rounded-xl hover:bg-amber-700 transition-colors">
+                {migrationStatus.loading ? "Syncing..." : "Inject Mock Data"}
+              </button>
+            </div>
+          )}
+
+          {isAddingShow ? (
+            <div className="bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] shadow-xl border-2 border-pink-500 animate-in zoom-in duration-300">
+              <h3 className="text-xs font-black text-slate-400 uppercase mb-6 tracking-[0.2em]">New Performance Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Display Title</label>
+                  <input type="text" placeholder="e.g. 2026 Spring Recital" className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl dark:text-white border-none mt-1 text-lg font-bold" value={newShowForm.label} onChange={e => setNewShowForm({...newShowForm, label: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Date</label>
+                  <input type="date" className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl dark:text-white border-none mt-1" value={newShowForm.date} onChange={e => setNewShowForm({...newShowForm, date: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Time</label>
+                  <input type="time" className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl dark:text-white border-none mt-1" value={newShowForm.time} onChange={e => setNewShowForm({...newShowForm, time: e.target.value})} />
+                </div>
+              </div>
+              <button onClick={() => {
+                const { date, time, label } = newShowForm;
+                if (!date || !time || !label) return showToast("Please fill out all fields", "error");
+                const id = new Date(`${date}T${time}`).toISOString();
+                setRecitalData(prev => ({ ...prev, [id]: { id, label, acts: [] } }));
+                setSelectedShowId(id);
+                setIsAddingShow(false);
+                showToast("Performance Created", "success");
+              }} className="w-full bg-pink-600 text-white p-5 rounded-2xl font-black mt-8 shadow-lg shadow-pink-500/30 active:scale-95 transition-transform">
+                Create Performance
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-[2rem] shadow-sm border border-slate-200 dark:border-slate-700">
+              <label className="block text-[10px] font-black uppercase text-slate-400 mb-2 ml-1">Selected Show</label>
+              <div className="flex gap-4">
+                <select className="flex-1 bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl dark:text-white font-bold border-none appearance-none" value={selectedShowId} onChange={e => setSelectedShowId(e.target.value)}>
+                  <option value="">-- Choose Show to Edit --</option>
+                  {recitalData && Object.keys(recitalData).map(k => <option key={k} value={k}>{recitalData[k].label} ({new Date(k).toLocaleDateString()})</option>)}
+                </select>
+                {editData && (
+                  <button onClick={async () => {
+                    if(window.confirm("Delete this entire show? This cannot be undone.")) {
+                      try {
+                          await deleteDoc(doc(db, `${DB_PREFIX}organizations/${orgId}/shows`, selectedShowId));
+                          const up = {...recitalData}; delete up[selectedShowId]; setRecitalData(up); setSelectedShowId('');
+                          showToast("Show deleted", "success");
+                      } catch (err) { showToast(err.message, "error"); }
+                    }
+                  }} className="p-4 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-2xl hover:bg-red-100 transition-colors">
+                    <Trash2 size={24} />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* --- ACT EDITOR --- */}
+          {editData && (
+            <div className="space-y-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+              <div className="flex justify-between items-center px-1">
+                <h3 className="font-black text-slate-400 uppercase text-[10px] tracking-widest">Act List ({editData.acts.length})</h3>
+                <button onClick={() => setEditData({...editData, acts: [...editData.acts, { number: editData.acts.length+1, title: "", performers: [] }]})} className="text-pink-600 text-[10px] font-black bg-pink-50 dark:bg-pink-900/20 px-5 py-2.5 rounded-xl uppercase tracking-tighter">Add Act</button>
+              </div>
+
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={editData.acts.map(a => a.number)} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-4">
+                    {editData.acts.map((act, idx) => (
+                      <SortableActCard 
+                        key={act.number} 
+                        act={act} 
+                        idx={idx} 
+                        updateAct={updateAct}
+                        onRemove={() => {
+                            setEditData({...editData, acts: editData.acts.filter((_, i) => i !== idx)});
+                            showToast(`Act #${act.number} removed`, "success");
+                        }}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-// ... (SortableActCard remains exactly the same below) ...
+// ... SortableActCard function remains exactly the same
 function SortableActCard({ act, idx, updateAct, onRemove }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: act.number });
   const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : 1, opacity: isDragging ? 0.6 : 1 };
