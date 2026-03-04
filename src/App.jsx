@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useApp } from './context/AppContext';
 import { useLiveTracker } from './hooks/useLiveTracker';
 import { clsx } from 'clsx';
@@ -6,7 +7,7 @@ import { clsx } from 'clsx';
 // Icons
 import { 
   List, Search, Users, Settings, ShieldAlert, 
-  Calendar, Building2, LogOut, User
+  Building2, LogOut, User 
 } from 'lucide-react';
 
 // Components
@@ -17,28 +18,60 @@ import SettingsView from './components/SettingsView';
 import AdminDashboard from './components/admin/AdminDashboard';
 import StickyHeader from './components/ui/StickyHeader';
 import NavButton from './components/ui/NavButton';
+import SidebarLink from './components/ui/SidebarLink';
 import LiveTrackerHero from './components/program/LiveTrackerHero';
 import StudioSelector from './components/StudioSelector';
 import LoginScreen from './components/LoginScreen';
 import ShowSelector from './components/ui/ShowSelector';
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState('program');
-  const [selectedShow, setSelectedShow] = useState('');
+// Helper component
+function LoadingScreen({ text }) {
+  return (
+    <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin"></div>
+        <div className="text-pink-600 font-bold animate-pulse tracking-widest uppercase text-[10px]">{text}</div>
+      </div>
+    </div>
+  );
+}
 
-  // 💥 BOOM. Pull everything from our new global state!
+export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // 1. Hook into Context
   const { 
     user, isAuthorized, isSuperAdmin, isAuthChecking, 
     hasSkippedLogin, skipLogin, favorites, toggleFavorite, 
     orgId, setOrgId 
   } = useApp();
 
+  // 2. Initialize show locally from URL (for deep links)
+  const [selectedShow, setSelectedShow] = useState(() => searchParams.get('show') || '');
+
+  // 3. Track Live Data
   const { 
     recitalData, currentAct, loading, 
     setRecitalData, updateActNumber, toggleTracking 
   } = useLiveTracker(orgId, selectedShow);
 
-  // Theme Restoration (Strictly DOM manipulation, so it stays here)
+  // 4. Handle deep-linked Organization
+  useEffect(() => {
+    const urlOrg = searchParams.get('org');
+    if (urlOrg && urlOrg !== orgId) {
+      setOrgId(urlOrg);
+    }
+  }, [searchParams, orgId, setOrgId]);
+
+  const handleSwitchStudio = () => {
+    setOrgId(null);
+    setSelectedShow(''); // Clear local state instead of URL
+    navigate('/');
+  };
+
+  // Theme Restoration
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'system';
     const applyTheme = (t) => {
@@ -49,76 +82,49 @@ export default function App() {
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
-      if (localStorage.getItem('theme') === 'system' || !localStorage.getItem('theme')) {
-        applyTheme('system');
-      }
+      if (localStorage.getItem('theme') === 'system' || !localStorage.getItem('theme')) applyTheme('system');
     };
-    
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
   // --- UI WATERFALL ---
 
-  if (isAuthChecking) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin"></div>
-          <div className="text-pink-600 font-bold animate-pulse tracking-widest uppercase text-[10px]">Loading</div>
-        </div>
-      </div>
-    );
-  }
+  if (isAuthChecking) return <LoadingScreen text="Loading" />;
 
-  if (!user && !hasSkippedLogin) {
-    return <LoginScreen onSkip={skipLogin} />;
-  }
+  if (!user && !hasSkippedLogin) return <LoginScreen onSkip={skipLogin} />;
 
-  if (!orgId && !(isSuperAdmin && activeTab === 'admin')) {
+  if (!orgId && !(isSuperAdmin && location.pathname.startsWith('/admin'))) {
     return (
       <div className="relative min-h-screen">
         {isSuperAdmin && (
           <div className="absolute top-4 right-4 md:top-8 md:right-8 z-50 animate-in fade-in zoom-in duration-500">
             <button 
-              onClick={() => setActiveTab('admin')}
+              onClick={() => navigate('/admin')}
               className="flex items-center gap-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-5 py-3 rounded-2xl font-black shadow-2xl hover:scale-105 transition-all"
             >
               <ShieldAlert size={20} /> Global Admin Setup
             </button>
           </div>
         )}
-        <StudioSelector onSelect={setOrgId} />
+        <StudioSelector onSelect={(id) => {
+          setOrgId(id);
+          // Immediately embed the org in the URL and go to the home page
+          navigate(`/?org=${id}`);
+        }} />
       </div>
     );
   }
 
-  if (loading) return (
-    <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin"></div>
-        <div className="text-pink-600 font-bold animate-pulse tracking-widest uppercase text-[10px]">Syncing Cloud</div>
-      </div>
-    </div>
-  );
+  if (loading) return <LoadingScreen text="Syncing Cloud" />;
 
-  const renderContent = () => {
-    const showData = selectedShow ? recitalData?.[selectedShow] : null;
-    
-    // We only pass props to the views that haven't been refactored to use Context yet
-    const props = { 
-      showData, currentAct, isAuthorized, favorites, toggleFavorite, user,
-      onUpdate: updateActNumber, onToggle: toggleTracking 
-    };
-
-    switch (activeTab) {
-      case 'program': return <ProgramView {...props} />;
-      case 'searchActs': return <SearchActView {...props} />;
-      case 'searchDancers': return <SearchDancerView {...props} />;
-      case 'admin': return <AdminDashboard recitalData={recitalData} setRecitalData={setRecitalData} />;
-      case 'settings': return <SettingsView />;
-      default: return <ProgramView {...props} />;
-    }
+  const isHideSelector = location.pathname.startsWith('/admin') || location.pathname.startsWith('/settings');
+  
+  const commonProps = { 
+    showData: selectedShow ? recitalData?.[selectedShow] : null, 
+    selectedShow,
+    currentAct, isAuthorized, favorites, toggleFavorite, user,
+    onUpdate: updateActNumber, onToggle: toggleTracking 
   };
 
   return (
@@ -135,26 +141,24 @@ export default function App() {
 
         {orgId && (
           <button 
-            onClick={() => setOrgId(null)}
+            onClick={handleSwitchStudio}
             className="mb-8 flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-pink-600 transition-colors bg-slate-100 dark:bg-slate-900 px-4 py-2 rounded-xl"
           >
             <Building2 size={14} /> Switch Studio
           </button>
         )}
         
-        {/* Main Links (Pushes bottom section down) */}
         <div className="space-y-2 flex-1">
-          <SidebarLink active={activeTab === 'program'} onClick={() => setActiveTab('program')} icon={<List size={20}/>} label="Program View" />
-          <SidebarLink active={activeTab === 'searchActs'} onClick={() => setActiveTab('searchActs')} icon={<Search size={20}/>} label="Search Acts" />
-          <SidebarLink active={activeTab === 'searchDancers'} onClick={() => setActiveTab('searchDancers')} icon={<Users size={20}/>} label="Dancer Search" />
+          <SidebarLink to="/" active={location.pathname === '/'} icon={<List size={20}/>} label="Program View" />
+          <SidebarLink to="/search-acts" active={location.pathname === '/search-acts'} icon={<Search size={20}/>} label="Search Acts" />
+          <SidebarLink to="/search-dancers" active={location.pathname === '/search-dancers'} icon={<Users size={20}/>} label="Dancer Search" />
         </div>
 
-        {/* Bottom Administrative Actions & Profile */}
         <div className="mt-auto pt-6 space-y-2 border-t border-slate-200 dark:border-slate-700">
           {isAuthorized && (
-            <SidebarLink active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} icon={<ShieldAlert size={20}/>} label="Admin Console" />
+            <SidebarLink to="/admin" active={location.pathname === '/admin'} icon={<ShieldAlert size={20}/>} label="Admin Console" />
           )}
-          <SidebarLink active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={20}/>} label="App Settings" />
+          <SidebarLink to="/settings" active={location.pathname === '/settings'} icon={<Settings size={20}/>} label="App Settings" />
           
           {user && (
             <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl flex items-center gap-3 border border-slate-100 dark:border-slate-800 shadow-inner">
@@ -182,7 +186,7 @@ export default function App() {
               </h1>
               {orgId && (
                 <button 
-                  onClick={() => setOrgId(null)}
+                  onClick={handleSwitchStudio}
                   className="p-2 bg-slate-200 dark:bg-slate-800 rounded-full text-slate-500 hover:text-pink-600 transition-colors shrink-0"
                   title="Switch Studio"
                 >
@@ -191,7 +195,6 @@ export default function App() {
               )}
             </div>
 
-            {/* Mobile Profile Indicator */}
             {user && (
               <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm animate-in fade-in">
                  <div className="w-8 h-8 bg-pink-100 dark:bg-pink-900/30 text-pink-600 rounded-full flex items-center justify-center shrink-0">
@@ -207,8 +210,7 @@ export default function App() {
             )}
           </header>
 
-          {/* Custom Show Selector */}
-          {activeTab !== 'admin' && activeTab !== 'settings' && (
+          {!isHideSelector && (
              <ShowSelector 
                 recitalData={recitalData} 
                 selectedShow={selectedShow} 
@@ -217,39 +219,40 @@ export default function App() {
           )}
 
           <main className="animate-in fade-in slide-in-from-bottom-2 duration-700">
-            {selectedShow && activeTab !== 'settings' && activeTab !== 'admin' && (
+            {selectedShow && !isHideSelector && (
               <LiveTrackerHero currentAct={currentAct} isAuthorized={isAuthorized} onUpdate={updateActNumber} onToggle={toggleTracking} />
             )}
-            {renderContent()}
+            
+            {/* The React Router Core Engine */}
+            <Routes>
+              <Route path="/" element={<ProgramView {...commonProps} />} />
+              <Route path="/search-acts" element={<SearchActView {...commonProps} />} />
+              <Route path="/search-dancers" element={<SearchDancerView {...commonProps} />} />
+              
+              {/* Protect the Admin Route */}
+              <Route 
+                path="/admin" 
+                element={isAuthorized ? <AdminDashboard recitalData={recitalData} setRecitalData={setRecitalData} /> : <Navigate to="/" />} 
+              />
+              
+              <Route path="/settings" element={<SettingsView />} />
+              
+              {/* Catch-all to send bad URLs back home */}
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+
           </main>
         </div>
       </div>
 
       {/* --- MOBILE BOTTOM NAV --- */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex justify-around h-24 items-center px-4 z-40">
-        <NavButton active={activeTab === 'program'} onClick={() => setActiveTab('program')} icon={<List/>} label="Program" />
-        <NavButton active={activeTab === 'searchActs'} onClick={() => setActiveTab('searchActs')} icon={<Search/>} label="Acts" />
-        <NavButton active={activeTab === 'searchDancers'} onClick={() => setActiveTab('searchDancers')} icon={<Users/>} label="Dancers" />
-        {isAuthorized && <NavButton active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} icon={<ShieldAlert/>} label="Admin" />}
-        <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings/>} label="Setup" />
+        <NavButton to="/" active={location.pathname === '/'} icon={<List/>} label="Program" />
+        <NavButton to="/search-acts" active={location.pathname === '/search-acts'} icon={<Search/>} label="Acts" />
+        <NavButton to="/search-dancers" active={location.pathname === '/search-dancers'} icon={<Users/>} label="Dancers" />
+        {isAuthorized && <NavButton to="/admin" active={location.pathname === '/admin'} icon={<ShieldAlert/>} label="Admin" />}
+        <NavButton to="/settings" active={location.pathname === '/settings'} icon={<Settings/>} label="Setup" />
       </nav>
     </div>
-  );
-}
-
-function SidebarLink({ active, onClick, icon, label }) {
-  return (
-    <button 
-      onClick={onClick}
-      className={clsx(
-        "w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 font-bold text-sm",
-        active 
-          ? "bg-pink-600 text-white shadow-xl shadow-pink-500/20 translate-x-1" 
-          : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-white"
-      )}
-    >
-      {icon}
-      {label}
-    </button>
   );
 }

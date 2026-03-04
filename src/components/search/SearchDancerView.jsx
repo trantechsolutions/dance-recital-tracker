@@ -1,15 +1,55 @@
 import React, { useState, useMemo } from 'react';
-import { Star, Search as SearchIcon, Cloud } from 'lucide-react';
+import { Star, Search as SearchIcon, Cloud, Share2, Check } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { useApp } from '../../context/AppContext';
 import { clsx } from 'clsx';
 
-export default function SearchDancerView({ showData, favorites, toggleFavorite, user }) {
-  const [query, setQuery] = useState('');
+export default function SearchDancerView({ showData, selectedShow, favorites, toggleFavorite, user }) {
+  const { orgId } = useApp();
+  const [searchParams] = useSearchParams();
+
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = async () => {
+    // 1. Build the custom URL manually
+    const baseUrl = window.location.origin + window.location.pathname;
+    const params = new URLSearchParams();
+    
+    if (orgId) params.set('org', orgId);
+    if (selectedShow) params.set('show', selectedShow);
+    if (searchQuery) params.set('q', searchQuery);
+    
+    const shareUrl = params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
+
+    // 2. Share it
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Dancer Search', url: shareUrl });
+        return;
+      } catch (err) { /* User cancelled share sheet */ }
+    }
+    
+    await navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // Update the URL without pushing a million new pages to browser history
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchParams(prev => {
+      if (val) prev.set('q', val);
+      else prev.delete('q');
+      return prev;
+    }, { replace: true }); // <--- 'replace: true' prevents the Back button from breaking
+  };
 
   // 1. Hook for Search Results
   const results = useMemo(() => {
-    if (!showData || !showData.acts || !query.trim()) return [];
+    if (!showData || !showData.acts || !searchQuery.trim()) return [];
     
-    const q = query.toLowerCase();
+    const q = searchQuery.toLowerCase();
     const map = {};
     
     showData.acts.forEach(act => {
@@ -24,7 +64,7 @@ export default function SearchDancerView({ showData, favorites, toggleFavorite, 
     return Object.entries(map)
       .map(([name, acts]) => ({ name, acts }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [query, showData]);
+  }, [searchQuery, showData]);
 
   // 2. Hook to gather currently favorited dancers in this show
   const favoriteDancers = useMemo(() => {
@@ -77,19 +117,31 @@ export default function SearchDancerView({ showData, favorites, toggleFavorite, 
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300 pb-10">
-      <div className="relative">
-        <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-        <input 
-          type="text" 
-          placeholder="Search for a dancer..."
-          className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white dark:bg-slate-800 dark:text-white border-none shadow-sm focus:ring-2 focus:ring-pink-500 outline-none transition-all"
-          value={query} 
-          onChange={e => setQuery(e.target.value)}
-        />
+      <div className="flex gap-3">
+        {/* Search Input Container */}
+        <div className="relative flex-1">
+          <SearchIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+          <input 
+            type="text" 
+            placeholder="Enter dancer's name..." 
+            className="w-full bg-white dark:bg-slate-800 p-5 pl-14 rounded-[2rem] shadow-sm border border-slate-200 dark:border-slate-700 font-bold text-lg dark:text-white outline-none focus:border-pink-500 focus:ring-4 focus:ring-pink-500/10 transition-all"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)} 
+          />
+        </div>
+
+        {/* Share Button */}
+        <button 
+          onClick={handleShare}
+          title="Share this search"
+          className="bg-white dark:bg-slate-800 w-[68px] rounded-[2rem] shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20 active:scale-95 transition-all shrink-0"
+        >
+          {copied ? <Check size={24} className="text-emerald-500" /> : <Share2 size={24} />}
+        </button>
       </div>
 
       <div>
-        {query ? (
+        {searchQuery ? (
           // --- SHOW SEARCH RESULTS ---
           <>
             {results.length > 0 ? (
@@ -97,7 +149,7 @@ export default function SearchDancerView({ showData, favorites, toggleFavorite, 
                 {results.map(res => <DancerCard key={res.name} res={res} />)}
               </div>
             ) : (
-              <p className="text-center text-slate-400 py-10 italic">No dancers found matching "{query}"</p>
+              <p className="text-center text-slate-400 py-10 italic">No dancers found matching "{searchQuery}"</p>
             )}
           </>
         ) : (

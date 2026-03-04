@@ -1,25 +1,24 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { clsx } from 'clsx';
 
-export default function NavButton({ active, onClick, icon, label }) {
+export default function NavButton({ active, to, icon, label }) {
   return (
-    <button 
-      onClick={onClick} 
+    <Link 
+      to={to}
       className={clsx(
-        "flex flex-col items-center justify-center flex-1 h-full gap-1 transition-all duration-200",
-        active ? "text-pink-600" : "text-slate-400 hover:text-slate-500"
+        "flex flex-col items-center justify-center w-16 h-16 rounded-2xl transition-all duration-300",
+        active 
+          ? "text-pink-600 bg-pink-50 dark:bg-pink-900/20 -translate-y-2 shadow-lg shadow-pink-500/20" 
+          : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
       )}
     >
-      <div className={clsx(
-        "p-1 rounded-lg transition-colors",
-        active && "bg-pink-50 dark:bg-pink-900/20"
-      )}>
-        {React.cloneElement(icon, { 
-          size: 22, 
-          strokeWidth: active ? 2.5 : 2 
-        })}
+      <div className={clsx("mb-1 transition-transform duration-300", active && "scale-110")}>
+        {icon}
       </div>
-      <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
-    </button>
+      <span className={clsx("text-[9px] font-black tracking-wider transition-all duration-300", active ? "opacity-100" : "opacity-0 h-0")}>
+        {label}
+      </span>
+    </Link>
   );
 }
