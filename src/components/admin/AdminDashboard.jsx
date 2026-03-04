@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useApp } from '../../context/AppContext';
 import { 
   Save, Calendar, Users, Plus, Trash2, Database, 
-  AlertCircle, X, Check, GripVertical, Building2, Shield, User as UserIcon, RefreshCw, Settings
+  AlertCircle, X, Check, GripVertical, Building2, Shield, User as UserIcon, RefreshCw
 } from 'lucide-react';
 import { doc, setDoc, deleteDoc, getDoc, updateDoc, collection, getDocs } from "firebase/firestore";
 import { db, DB_PREFIX } from '../../firebase';
@@ -19,7 +20,9 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-export default function AdminDashboard({ recitalData, user, isSuperAdmin, setRecitalData, orgId, setOrgId }) {
+export default function AdminDashboard({ recitalData, setRecitalData }) {
+  const { user, isSuperAdmin, orgId, setOrgId } = useApp(); // Pulled from context!
+
   const [selectedShowId, setSelectedShowId] = useState('');
   const [editData, setEditData] = useState(null);
   
@@ -68,7 +71,7 @@ export default function AdminDashboard({ recitalData, user, isSuperAdmin, setRec
     setTimeout(() => setToast(null), 3000);
   };
 
-  // --- ORG MANAGEMENT FUNCTIONS (RESTORED) ---
+  // --- ORG MANAGEMENT FUNCTIONS ---
   const handleCreateOrg = async () => {
     if (!newOrgForm.id || !newOrgForm.name) return showToast("ID and Name required", "error");
     try {
@@ -198,7 +201,7 @@ export default function AdminDashboard({ recitalData, user, isSuperAdmin, setRec
         </div>
       )}
 
-      {/* --- STUDIO SETTINGS TAB (RESTORED) --- */}
+      {/* --- STUDIO SETTINGS TAB --- */}
       {activeAdminTab === 'studio' && isSuperAdmin && (
         <div className="bg-slate-50 dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden animate-in fade-in">
           <Building2 size={120} className="absolute -right-10 -top-10 text-slate-200 dark:text-slate-800 opacity-50 pointer-events-none" />
@@ -207,7 +210,7 @@ export default function AdminDashboard({ recitalData, user, isSuperAdmin, setRec
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <div>
                 <h3 className="text-[10px] font-black uppercase text-pink-600 dark:text-pink-500 tracking-[0.2em] mb-1">Global Organization Settings</h3>
-                <h4 className="text-2xl font-black dark:text-white">{orgData.name || orgId}</h4>
+                <h4 className="text-2xl font-black dark:text-white">{orgData.name || orgId || "No Studio Selected"}</h4>
               </div>
               <button
                 onClick={() => setIsCreatingOrg(!isCreatingOrg)}
@@ -251,12 +254,14 @@ export default function AdminDashboard({ recitalData, user, isSuperAdmin, setRec
                     </button>
                   </div>
                 ))}
-                <div className="flex gap-2 mt-2">
-                  <input type="email" placeholder="Add teacher@studio.com" className="flex-1 bg-white dark:bg-slate-800 p-3 rounded-xl dark:text-white border border-slate-200 dark:border-slate-700 outline-none focus:border-pink-500 text-sm shadow-sm" value={newOrgAdminEmail} onChange={e => setNewOrgAdminEmail(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newOrgAdminEmail.trim()) { handleUpdateOrgAdmins([...(orgData.admins || []), newOrgAdminEmail.trim()]); setNewOrgAdminEmail(''); }}} />
-                  <button onClick={() => { if (newOrgAdminEmail.trim()) { handleUpdateOrgAdmins([...(orgData.admins || []), newOrgAdminEmail.trim()]); setNewOrgAdminEmail(''); }}} className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white px-5 rounded-xl font-bold text-sm hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">
-                    Add
-                  </button>
-                </div>
+                {orgId && (
+                  <div className="flex gap-2 mt-2">
+                    <input type="email" placeholder="Add teacher@studio.com" className="flex-1 bg-white dark:bg-slate-800 p-3 rounded-xl dark:text-white border border-slate-200 dark:border-slate-700 outline-none focus:border-pink-500 text-sm shadow-sm" value={newOrgAdminEmail} onChange={e => setNewOrgAdminEmail(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newOrgAdminEmail.trim()) { handleUpdateOrgAdmins([...(orgData.admins || []), newOrgAdminEmail.trim()]); setNewOrgAdminEmail(''); }}} />
+                    <button onClick={() => { if (newOrgAdminEmail.trim()) { handleUpdateOrgAdmins([...(orgData.admins || []), newOrgAdminEmail.trim()]); setNewOrgAdminEmail(''); }}} className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white px-5 rounded-xl font-bold text-sm hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">
+                      Add
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -332,7 +337,6 @@ export default function AdminDashboard({ recitalData, user, isSuperAdmin, setRec
             </div>
           </div>
 
-          {/* Cloud Migration Status (SuperAdmin Only) */}
           {isSuperAdmin && !editData && !isAddingShow && (
             <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/50 p-5 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -436,7 +440,6 @@ export default function AdminDashboard({ recitalData, user, isSuperAdmin, setRec
   );
 }
 
-// ... SortableActCard function remains exactly the same
 function SortableActCard({ act, idx, updateAct, onRemove }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: act.number });
   const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : 1, opacity: isDragging ? 0.6 : 1 };

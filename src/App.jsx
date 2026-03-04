@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db, authorizedUsers, DB_PREFIX } from './firebase'; 
+import { useApp } from './context/AppContext';
 import { useLiveTracker } from './hooks/useLiveTracker';
 import { clsx } from 'clsx';
 
@@ -26,26 +24,20 @@ import LoginScreen from './components/LoginScreen';
 export default function App() {
   const [activeTab, setActiveTab] = useState('program');
   const [selectedShow, setSelectedShow] = useState('');
-  const [user, setUser] = useState(null);
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [favorites, setFavorites] = useState(new Set());
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
-  const [hasSkippedLogin, setHasSkippedLogin] = useState(() => localStorage.getItem('hasSkippedLogin') === 'true');
-  
-  // Organization state synced with localStorage
-  const [orgId, setOrgId] = useState(() => localStorage.getItem('selectedOrgId') || null);
+
+  // 💥 BOOM. Pull everything from our new global state!
+  const { 
+    user, isAuthorized, isSuperAdmin, isAuthChecking, 
+    hasSkippedLogin, skipLogin, favorites, toggleFavorite, 
+    orgId, setOrgId 
+  } = useApp();
 
   const { 
-    recitalData, 
-    currentAct, 
-    loading, 
-    setRecitalData, 
-    updateActNumber, 
-    toggleTracking 
+    recitalData, currentAct, loading, 
+    setRecitalData, updateActNumber, toggleTracking 
   } = useLiveTracker(orgId, selectedShow);
 
-  // Restore Theme on Load
+  // Theme Restoration (Strictly DOM manipulation, so it stays here)
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'system';
     const applyTheme = (t) => {
@@ -65,75 +57,8 @@ export default function App() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  // Strict Cloud-Only Authentication & Favorites Sync
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      const isSuper = u && authorizedUsers.includes(u.email);
-      setIsSuperAdmin(isSuper);
-      setIsAuthorized(isSuper);
+  // --- UI WATERFALL ---
 
-      if (u) {
-        // User logged in! Fetch their cloud favorites
-        const userRef = doc(db, `${DB_PREFIX}users`, u.uid);
-        const userSnap = await getDoc(userRef);
-        
-        if (userSnap.exists() && userSnap.data().favorites) {
-          setFavorites(new Set(userSnap.data().favorites));
-        } else {
-          setFavorites(new Set()); 
-        }
-
-        // NEW: Save their email and last login time so the Admin Dashboard can see it!
-        setDoc(userRef, { 
-          email: u.email,
-          lastLogin: new Date().toISOString()
-        }, { merge: true }).catch(err => console.error("Error saving user profile", err));
-
-      } else {
-        setFavorites(new Set());
-      }
-      
-      // NEW: Tell the app we are done checking auth
-      setIsAuthChecking(false);
-    });
-    return unsubscribe;
-  }, []);
-
-  // Sync orgId to localStorage
-  useEffect(() => {
-    if (orgId) {
-      localStorage.setItem('selectedOrgId', orgId);
-    } else {
-      localStorage.removeItem('selectedOrgId');
-      setSelectedShow(''); 
-    }
-  }, [orgId]);
-
-  const toggleFavorite = async (name) => {
-    if (!user) {
-      alert("Please create an account or sign in from the Setup tab to save favorites!");
-      setActiveTab('settings'); // Automatically route them to the settings tab to log in
-      return;
-    }
-
-    setFavorites(prev => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      
-      const newFavArray = Array.from(next);
-      
-      // Sync directly to Firestore, no localStorage fallback
-      const userRef = doc(db, `${DB_PREFIX}users`, user.uid);
-      setDoc(userRef, { favorites: newFavArray }, { merge: true })
-        .catch(err => console.error("Failed to sync favorites:", err));
-
-      return next;
-    });
-  };
-
-  // 1. Show global loading state while Firebase checks authentication
   if (isAuthChecking) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
@@ -145,17 +70,10 @@ export default function App() {
     );
   }
 
-  // 2. Show Login Screen if they aren't logged in AND haven't clicked "Continue as Guest"
   if (!user && !hasSkippedLogin) {
-    return (
-      <LoginScreen onSkip={() => {
-        setHasSkippedLogin(true);
-        localStorage.setItem('hasSkippedLogin', 'true');
-      }} />
-    );
+    return <LoginScreen onSkip={skipLogin} />;
   }
 
-  // 3. Show Studio Selector if no organization is chosen yet
   if (!orgId && !(isSuperAdmin && activeTab === 'admin')) {
     return (
       <div className="relative min-h-screen">
@@ -174,7 +92,6 @@ export default function App() {
     );
   }
 
-  // 4. Show loading state if the specific studio data is being fetched
   if (loading) return (
     <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
       <div className="flex flex-col items-center gap-4">
@@ -186,6 +103,8 @@ export default function App() {
 
   const renderContent = () => {
     const showData = selectedShow ? recitalData?.[selectedShow] : null;
+    
+    // We only pass props to the views that haven't been refactored to use Context yet
     const props = { 
       showData, currentAct, isAuthorized, favorites, toggleFavorite, user,
       onUpdate: updateActNumber, onToggle: toggleTracking 
@@ -195,8 +114,8 @@ export default function App() {
       case 'program': return <ProgramView {...props} />;
       case 'searchActs': return <SearchActView {...props} />;
       case 'searchDancers': return <SearchDancerView {...props} />;
-      case 'admin': return <AdminDashboard recitalData={recitalData} user={user} isSuperAdmin={isSuperAdmin} setRecitalData={setRecitalData} orgId={orgId} setOrgId={setOrgId} />;
-      case 'settings': return <SettingsView user={user} setOrgId={setOrgId} />;
+      case 'admin': return <AdminDashboard recitalData={recitalData} setRecitalData={setRecitalData} />;
+      case 'settings': return <SettingsView />;
       default: return <ProgramView {...props} />;
     }
   };
@@ -208,18 +127,19 @@ export default function App() {
       <nav className="hidden md:flex md:w-72 md:flex-col md:fixed md:h-full bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-8 z-50">
         <div className="mb-8">
           <h1 className="text-3xl font-black text-pink-600 tracking-tighter leading-none capitalize">
-            {orgId ? orgId.replace(/-/g, ' ') : "Studio"}
+            {orgId ? orgId.replace(/-/g, ' ') : "Global Admin"}
           </h1>
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-3">Recital Portal</p>
         </div>
 
-        {/* Desktop Switch Studio Button */}
-        <button 
-          onClick={() => setOrgId(null)}
-          className="mb-8 flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-pink-600 transition-colors bg-slate-100 dark:bg-slate-900 px-4 py-2 rounded-xl"
-        >
-          <Building2 size={14} /> Switch Studio
-        </button>
+        {orgId && (
+          <button 
+            onClick={() => setOrgId(null)}
+            className="mb-8 flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-pink-600 transition-colors bg-slate-100 dark:bg-slate-900 px-4 py-2 rounded-xl"
+          >
+            <Building2 size={14} /> Switch Studio
+          </button>
+        )}
         
         <div className="space-y-2 flex-1">
           <SidebarLink active={activeTab === 'program'} onClick={() => setActiveTab('program')} icon={<List size={20}/>} label="Program View" />
@@ -239,16 +159,18 @@ export default function App() {
         
         <div className="max-w-4xl mx-auto px-4 md:px-12 pt-8">
           <header className="md:hidden flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-black text-pink-600 tracking-tighter leading-none capitalize">
+            <h1 className="text-3xl font-black text-pink-600 tracking-tight capitalize truncate pr-4">
               {orgId ? orgId.replace(/-/g, ' ') : "Global Admin"}
             </h1>
-            <button 
-              onClick={() => setOrgId(null)}
-              className="p-2 bg-slate-200 dark:bg-slate-800 rounded-full text-slate-500 hover:text-pink-600 transition-colors"
-              title="Switch Studio"
-            >
-              <LogOut size={20} className="rotate-180" />
-            </button>
+            {orgId && (
+              <button 
+                onClick={() => setOrgId(null)}
+                className="p-2 bg-slate-200 dark:bg-slate-800 rounded-full text-slate-500 hover:text-pink-600 transition-colors"
+                title="Switch Studio"
+              >
+                <LogOut size={20} className="rotate-180" />
+              </button>
+            )}
           </header>
 
           {/* Responsive Show Selector */}

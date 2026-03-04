@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useApp } from '../context/AppContext';
 import { Sun, Moon, Monitor, LogOut, Info, ChevronRight, User, Building2, AlertCircle } from 'lucide-react';
 import { marked } from 'marked';
 import { auth, googleProvider } from '../firebase';
 import { signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { clsx } from 'clsx';
 
-export default function SettingsView({ user, setOrgId }) {
+export default function SettingsView() {
+  const { user, setOrgId, clearSkipLogin } = useApp(); // Pulled from context!
+
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
   const [changelog, setChangelog] = useState('');
   const [showLog, setShowLog] = useState(false);
@@ -73,7 +76,7 @@ export default function SettingsView({ user, setOrgId }) {
         </button>
       </section>
 
-      {/* Account Section (Now with Email/Password) */}
+      {/* Account Section */}
       <section className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Account & Sync</h3>
@@ -150,7 +153,7 @@ export default function SettingsView({ user, setOrgId }) {
             </div>
             <button 
               onClick={() => {
-                localStorage.removeItem('hasSkippedLogin'); // <--- Clear the flag
+                clearSkipLogin(); // Use the context action!
                 signOut(auth);
               }} 
               className="text-red-500 p-4 bg-red-50 dark:bg-red-900/20 rounded-xl hover:bg-red-100 transition-colors"
@@ -172,7 +175,7 @@ export default function SettingsView({ user, setOrgId }) {
         </div>
       </section>
 
-      {/* ... Version Info remains the same ... */}
+      {/* Version Info */}
       <section>
         <button 
           onClick={() => setShowLog(!showLog)}
