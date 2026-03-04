@@ -153,7 +153,7 @@ export default function AdminDashboard({ recitalData, isAuthorized, setRecitalDa
         <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
           <select className="w-full bg-slate-50 dark:bg-slate-900 p-3 rounded-xl dark:text-white font-bold text-sm border-none" value={selectedShowId} onChange={e => setSelectedShowId(e.target.value)}>
             <option value="">-- Choose Show to Edit --</option>
-            {recitalData && Object.keys(recitalData).map(k => <option key={k} value={k}>{recitalData[k].label}</option>)}
+            {recitalData && Object.keys(recitalData).map(k => <option key={k} value={k}>{recitalData[k].label} ({new Date(k).toLocaleDateString()})</option>)}
           </select>
         </div>
       )}
