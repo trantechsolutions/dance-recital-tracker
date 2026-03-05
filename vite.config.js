@@ -7,5 +7,5 @@ export default defineConfig({
     react(),
     VitePWA({ registerType: 'autoUpdate' }) // Handles the service worker for you
   ],
-  base: './',
+  base: '/dance-recital-tracker/',
 });
