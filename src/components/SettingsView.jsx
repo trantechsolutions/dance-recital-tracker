@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Sun, Moon, Monitor, LogOut, Info, ChevronRight, User, Building2, AlertCircle } from 'lucide-react';
 import { marked } from 'marked';
-import { auth, googleProvider } from '../firebase';
-import { signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { supabase } from '../supabase';
 import { clsx } from 'clsx';
 
 export default function SettingsView() {
-  const { user, setOrgId, clearSkipLogin } = useApp(); // Pulled from context!
+  const { user, setOrgId, clearSkipLogin } = useApp();
 
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
   const [changelog, setChangelog] = useState('');
@@ -41,16 +40,34 @@ export default function SettingsView() {
     e.preventDefault();
     setAuthError('');
     try {
+      let result;
       if (isRegistering) {
-        await createUserWithEmailAndPassword(auth, email, password);
+        result = await supabase.auth.signUp({ email, password });
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
+        result = await supabase.auth.signInWithPassword({ email, password });
       }
+      if (result.error) throw result.error;
       setEmail('');
       setPassword('');
     } catch (err) {
-      setAuthError(err.message.replace('Firebase: ', ''));
+      setAuthError(err.message);
     }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setAuthError('');
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + (import.meta.env.BASE_URL || '/')
+      }
+    });
+    if (error) setAuthError(error.message);
+  };
+
+  const handleSignOut = async () => {
+    clearSkipLogin();
+    await supabase.auth.signOut();
   };
 
   return (
@@ -87,7 +104,7 @@ export default function SettingsView() {
           )}
         </div>
 
-        {(!user || user.isAnonymous) ? (
+        {!user ? (
           <div className="space-y-4">
             {authError && (
               <div className="flex items-center gap-2 text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-xl">
@@ -135,7 +152,7 @@ export default function SettingsView() {
               </div>
 
               <button 
-                onClick={() => signInWithPopup(auth, googleProvider)}
+                onClick={handleGoogleSignIn}
                 className="w-full py-3 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
               >
                 <User size={18} /> Continue with Google
@@ -152,10 +169,7 @@ export default function SettingsView() {
               </p>
             </div>
             <button 
-              onClick={() => {
-                clearSkipLogin(); // Use the context action!
-                signOut(auth);
-              }} 
+              onClick={handleSignOut}
               className="text-red-500 p-4 bg-red-50 dark:bg-red-900/20 rounded-xl hover:bg-red-100 transition-colors"
               title="Sign Out"
             >

@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db, authorizedUsers, DB_PREFIX } from '../firebase'; 
+import { supabase, authorizedUsers } from '../supabase';
 
 const AppContext = createContext();
 
@@ -17,37 +15,95 @@ export function AppProvider({ children }) {
 
   // --- Auth & Favorites Sync ---
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      const isSuper = u && authorizedUsers.includes(u.email);
-      setIsSuperAdmin(isSuper);
-      setIsAuthorized(isSuper);
+    let isMounted = true;
 
-      if (u) {
-        // Fetch strict cloud favorites
-        const userRef = doc(db, `${DB_PREFIX}users`, u.uid);
-        const userSnap = await getDoc(userRef);
-        
-        if (userSnap.exists() && userSnap.data().favorites) {
-          setFavorites(new Set(userSnap.data().favorites));
-        } else {
-          setFavorites(new Set()); 
-        }
-
-        // Save login timestamp for the Admin User Table
-        setDoc(userRef, { 
-          email: u.email,
-          lastLogin: new Date().toISOString()
-        }, { merge: true }).catch(err => console.error("Error saving user profile", err));
-
-      } else {
-        setFavorites(new Set());
+    // Safety timeout — if auth still hasn't resolved after 5s, unlock the UI
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) {
+        console.warn("[Auth] Safety timeout reached — unlocking UI");
+        setIsAuthChecking(false);
       }
-      
-      setIsAuthChecking(false);
+    }, 5000);
+
+    // 1. Check current session on mount
+    const initAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) console.error("[Auth] getSession error:", error.message);
+        if (session?.user) {
+          await handleUserLogin(session.user);
+        }
+      } catch (err) {
+        console.error("[Auth] initAuth failed:", err);
+      } finally {
+        if (isMounted) {
+          clearTimeout(safetyTimer);
+          setIsAuthChecking(false);
+        }
+      }
+    };
+
+    initAuth();
+
+    // 2. Listen for auth state changes (including INITIAL_SESSION in Supabase v2)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      try {
+        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
+          await handleUserLogin(session.user);
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setIsAuthorized(false);
+          setIsSuperAdmin(false);
+          setFavorites(new Set());
+        }
+      } catch (err) {
+        console.error("[Auth] onAuthStateChange error:", err);
+      } finally {
+        if (isMounted) {
+          clearTimeout(safetyTimer);
+          setIsAuthChecking(false);
+        }
+      }
     });
-    return unsubscribe;
+
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimer);
+      subscription.unsubscribe();
+    };
   }, []);
+
+  const handleUserLogin = async (u) => {
+    setUser(u);
+    const isSuper = u && authorizedUsers.includes(u.email);
+    setIsSuperAdmin(isSuper);
+    setIsAuthorized(isSuper);
+
+    // Fetch user profile & favorites
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('favorites')
+      .eq('id', u.id)
+      .single();
+
+    if (profile?.favorites) {
+      setFavorites(new Set(profile.favorites));
+    } else {
+      setFavorites(new Set());
+    }
+
+    // Upsert user profile with login timestamp
+    await supabase
+      .from('user_profiles')
+      .upsert({
+        id: u.id,
+        email: u.email,
+        last_login: new Date().toISOString()
+      }, { onConflict: 'id' })
+      .then(({ error }) => {
+        if (error) console.error("Error saving user profile", error);
+      });
+  };
 
   // --- Org ID Sync ---
   useEffect(() => {
@@ -62,18 +118,22 @@ export function AppProvider({ children }) {
   const toggleFavorite = async (name) => {
     if (!user) {
       alert("Please create an account or sign in from the Setup tab to save favorites!");
-      return false; // Return false so the UI knows they aren't logged in
+      return false;
     }
 
     setFavorites(prev => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
       else next.add(name);
-      
+
       const newFavArray = Array.from(next);
-      const userRef = doc(db, `${DB_PREFIX}users`, user.uid);
-      setDoc(userRef, { favorites: newFavArray }, { merge: true })
-        .catch(err => console.error("Failed to sync favorites:", err));
+      supabase
+        .from('user_profiles')
+        .update({ favorites: newFavArray })
+        .eq('id', user.id)
+        .then(({ error }) => {
+          if (error) console.error("Failed to sync favorites:", error);
+        });
 
       return next;
     });
@@ -91,7 +151,7 @@ export function AppProvider({ children }) {
   };
 
   const value = {
-    user, isAuthorized, isSuperAdmin, isAuthChecking, 
+    user, isAuthorized, isSuperAdmin, isAuthChecking,
     hasSkippedLogin, skipLogin, clearSkipLogin,
     favorites, toggleFavorite,
     orgId, setOrgId
@@ -104,7 +164,6 @@ export function AppProvider({ children }) {
   );
 }
 
-// Custom hook to easily grab this data from any component
 export const useApp = () => {
   return useContext(AppContext);
 };

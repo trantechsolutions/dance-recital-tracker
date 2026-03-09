@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { User, AlertCircle } from 'lucide-react';
-import { auth, googleProvider } from '../firebase';
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { supabase } from '../supabase';
 
 export default function LoginScreen({ onSkip }) {
   const [email, setEmail] = useState('');
@@ -13,14 +12,28 @@ export default function LoginScreen({ onSkip }) {
     e.preventDefault();
     setAuthError('');
     try {
+      let result;
       if (isRegistering) {
-        await createUserWithEmailAndPassword(auth, email, password);
+        result = await supabase.auth.signUp({ email, password });
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
+        result = await supabase.auth.signInWithPassword({ email, password });
       }
+      
+      if (result.error) throw result.error;
     } catch (err) {
-      setAuthError(err.message.replace('Firebase: ', ''));
+      setAuthError(err.message);
     }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setAuthError('');
+    const { error } = await supabase.auth.signInWithOAuth({ 
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + (import.meta.env.BASE_URL || '/')
+      }
+    });
+    if (error) setAuthError(error.message);
   };
 
   return (
@@ -89,7 +102,7 @@ export default function LoginScreen({ onSkip }) {
           </div>
 
           <button 
-            onClick={() => signInWithPopup(auth, googleProvider)}
+            onClick={handleGoogleSignIn}
             className="w-full py-4 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors mb-4"
           >
             <User size={18} /> Continue with Google

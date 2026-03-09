@@ -4,8 +4,7 @@ import {
   Save, Calendar, Users, Plus, Trash2, Database, 
   AlertCircle, X, Check, GripVertical, Building2, Shield, User as UserIcon, RefreshCw
 } from 'lucide-react';
-import { doc, setDoc, deleteDoc, getDoc, updateDoc, collection, getDocs, writeBatch } from "firebase/firestore";
-import { db, DB_PREFIX } from '../../firebase';
+import { supabase } from '../../supabase';
 import { clsx } from 'clsx';
 import { generateMockData } from '../../utils/mockData';
 import Papa from 'papaparse';
@@ -43,7 +42,6 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
   const [appUsers, setAppUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   
-  // Default to 'studio' if no orgId exists yet (for fresh setups)
   const [activeAdminTab, setActiveAdminTab] = useState(orgId ? 'shows' : 'studio');
 
   const sensors = useSensors(
@@ -55,8 +53,13 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
   useEffect(() => {
     const fetchOrg = async () => {
       if (!orgId) return;
-      const snap = await getDoc(doc(db, `${DB_PREFIX}organizations`, orgId));
-      if (snap.exists()) setOrgData(snap.data());
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('name, admins')
+        .eq('id', orgId)
+        .single();
+      
+      if (data) setOrgData(data);
     };
     fetchOrg();
   }, [orgId]);
@@ -86,25 +89,28 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
       skipEmptyLines: true,
       complete: async (results) => {
         try {
-          const batch = writeBatch(db);
           const newActs = results.data.map((row, index) => ({
+            show_id: selectedShowId,
             number: parseInt(row.number) || index + 1,
             title: row.title || "Untitled Act",
             performers: row.performers ? row.performers.split(';').map(p => p.trim()) : []
           }));
 
-          newActs.forEach((act) => {
-            const docRef = doc(db, `${DB_PREFIX}organizations/${orgId}/shows/${selectedShowId}/acts`, `act_${act.number}`);
-            batch.set(docRef, act);
-          });
+          // Delete existing acts for this show, then insert new ones
+          await supabase.from('acts').delete().eq('show_id', selectedShowId);
+          const { error } = await supabase.from('acts').insert(newActs);
 
-          await batch.commit();
+          if (error) throw error;
+
           showToast(`Successfully uploaded ${newActs.length} acts!`, "success");
           
           // Refresh local state
           setRecitalData(prev => ({
             ...prev,
-            [selectedShowId]: { ...prev[selectedShowId], acts: newActs }
+            [selectedShowId]: { 
+              ...prev[selectedShowId], 
+              acts: newActs.map(a => ({ number: a.number, title: a.title, performers: a.performers }))
+            }
           }));
         } catch (err) {
           showToast(err.message, "error");
@@ -119,7 +125,13 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
     try {
       const formattedId = newOrgForm.id.toLowerCase().replace(/[^a-z0-9-]/g, '-');
       const admins = newOrgForm.adminEmail ? [newOrgForm.adminEmail] : [];
-      await setDoc(doc(db, `${DB_PREFIX}organizations`, formattedId), { name: newOrgForm.name, admins });
+      
+      const { error } = await supabase
+        .from('organizations')
+        .insert({ id: formattedId, name: newOrgForm.name, admins });
+
+      if (error) throw error;
+
       showToast("Studio Created Successfully!", "success");
       setIsCreatingOrg(false);
       setNewOrgForm({ id: '', name: '', adminEmail: '' });
@@ -129,7 +141,13 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
 
   const handleUpdateOrgAdmins = async (newAdmins) => {
     try {
-      await updateDoc(doc(db, `${DB_PREFIX}organizations`, orgId), { admins: newAdmins });
+      const { error } = await supabase
+        .from('organizations')
+        .update({ admins: newAdmins })
+        .eq('id', orgId);
+
+      if (error) throw error;
+
       setOrgData({ ...orgData, admins: newAdmins });
       showToast("Studio admins updated", "success");
     } catch (e) { showToast(e.message, "error"); }
@@ -140,10 +158,13 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
     if (!isSuperAdmin) return;
     setLoadingUsers(true);
     try {
-      const snap = await getDocs(collection(db, `${DB_PREFIX}users`));
-      const usersList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      usersList.sort((a, b) => new Date(b.lastLogin || 0) - new Date(a.lastLogin || 0));
-      setAppUsers(usersList);
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('id, email, favorites, last_login')
+        .order('last_login', { ascending: false });
+
+      if (error) throw error;
+      setAppUsers(data || []);
     } catch (e) { showToast(e.message, 'error'); }
     finally { setLoadingUsers(false); }
   };
@@ -160,8 +181,30 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
         ...act,
         performers: act.performers.map(p => p.trim()).filter(p => p !== "")
       }));
+
+      // 1. Upsert the show record
+      const { error: showError } = await supabase
+        .from('shows')
+        .upsert({ id: editData.id, org_id: orgId, label: editData.label }, { onConflict: 'id' });
+
+      if (showError) throw showError;
+
+      // 2. Replace all acts: delete existing, then insert new
+      await supabase.from('acts').delete().eq('show_id', editData.id);
+      
+      if (cleanedActs.length > 0) {
+        const actsToInsert = cleanedActs.map(act => ({
+          show_id: editData.id,
+          number: act.number,
+          title: act.title,
+          performers: act.performers
+        }));
+
+        const { error: actsError } = await supabase.from('acts').insert(actsToInsert);
+        if (actsError) throw actsError;
+      }
+
       const dataToSave = { ...editData, acts: cleanedActs };
-      await setDoc(doc(db, `${DB_PREFIX}organizations/${orgId}/shows`, editData.id), dataToSave);
       setRecitalData(prev => ({ ...prev, [editData.id]: dataToSave }));
       showToast("Changes saved", "success");
     } catch (err) { showToast(err.message, "error"); }
@@ -171,9 +214,29 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
     setMigrationStatus({ loading: true, error: null });
     try {
       const mockData = generateMockData();
+      
       for (const key of Object.keys(mockData)) {
-        await setDoc(doc(db, `${DB_PREFIX}organizations/${orgId}/shows`, mockData[key].id), mockData[key]);
+        const show = mockData[key];
+        
+        // Insert show
+        await supabase
+          .from('shows')
+          .upsert({ id: show.id, org_id: orgId, label: show.label }, { onConflict: 'id' });
+
+        // Delete existing acts then insert new
+        await supabase.from('acts').delete().eq('show_id', show.id);
+        
+        if (show.acts.length > 0) {
+          const actsToInsert = show.acts.map(act => ({
+            show_id: show.id,
+            number: act.number,
+            title: act.title,
+            performers: act.performers
+          }));
+          await supabase.from('acts').insert(actsToInsert);
+        }
       }
+
       setRecitalData(mockData);
       showToast("Mock Data Synchronized!", "success");
       setMigrationStatus({ loading: false, error: null });
@@ -342,7 +405,7 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
                 <tr key={u.id} className="text-sm">
                   <td className="px-8 py-4 font-bold dark:text-white">{u.email || "Anonymous"}</td>
                   <td className="px-8 py-4"><span className="bg-pink-100 text-pink-600 px-3 py-1 rounded-full text-xs font-black">{u.favorites?.length || 0}</span></td>
-                  <td className="px-8 py-4 text-right text-slate-400">{u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : "N/A"}</td>
+                  <td className="px-8 py-4 text-right text-slate-400">{u.last_login ? new Date(u.last_login).toLocaleDateString() : "N/A"}</td>
                 </tr>
               ))}
             </tbody>
@@ -395,7 +458,7 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
                 </div>
               </div>
               <button 
-                onClick={() => {
+                onClick={async () => {
                   const { date, time, label } = newShowForm;
                   if (!date || !time || !label) return showToast("Please fill out all fields", "error");
                   
