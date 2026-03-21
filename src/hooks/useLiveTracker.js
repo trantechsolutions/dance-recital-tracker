@@ -1,70 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../supabase';
+import { useState, useEffect } from 'react';
+import { db } from '../firebase';
+import {
+  collection, query, where, getDocs, doc, setDoc, onSnapshot, orderBy
+} from 'firebase/firestore';
 
 export function useLiveTracker(orgId, selectedShowId) {
   const [recitalData, setRecitalData] = useState(null);
   const [currentAct, setCurrentAct] = useState({ number: null, title: '', isTracking: false });
   const [loading, setLoading] = useState(true);
 
-  // --- Helper: Fetch all shows + acts for an org and build the recitalData shape ---
-  const fetchProgramData = useCallback(async () => {
-    if (!orgId) {
-      setRecitalData(null);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      // Fetch all shows for this org
-      const { data: shows, error: showsErr } = await supabase
-        .from('shows')
-        .select('id, label')
-        .eq('org_id', orgId);
-
-      if (showsErr) throw showsErr;
-
-      if (!shows || shows.length === 0) {
-        setRecitalData({});
-        setLoading(false);
-        return;
-      }
-
-      // Fetch all acts for these shows
-      const showIds = shows.map(s => s.id);
-      const { data: acts, error: actsErr } = await supabase
-        .from('acts')
-        .select('show_id, number, title, performers')
-        .in('show_id', showIds)
-        .order('number', { ascending: true });
-
-      if (actsErr) throw actsErr;
-
-      // Build the same shape as the old Firebase data
-      const data = {};
-      shows.forEach(show => {
-        data[show.id] = {
-          id: show.id,
-          label: show.label,
-          acts: (acts || [])
-            .filter(a => a.show_id === show.id)
-            .map(a => ({
-              number: a.number,
-              title: a.title,
-              performers: a.performers || []
-            }))
-        };
-      });
-
-      console.log(`Program Data Loaded for Org [${orgId}]:`, Object.keys(data));
-      setRecitalData(data);
-    } catch (err) {
-      console.error("Supabase Program Error:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [orgId]);
-
-  // 1. Initial data fetch + realtime subscription for shows & acts
+  // 1. Real-time subscription for shows + acts for an org
   useEffect(() => {
     if (!orgId) {
       setRecitalData(null);
@@ -72,33 +17,54 @@ export function useLiveTracker(orgId, selectedShowId) {
       return;
     }
 
-    fetchProgramData();
+    setLoading(true);
 
-    // Subscribe to realtime changes on shows for this org
-    const showsChannel = supabase
-      .channel(`shows-${orgId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'shows', filter: `org_id=eq.${orgId}` },
-        () => {
-          // Re-fetch all program data when any show changes
-          fetchProgramData();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'acts' },
-        (payload) => {
-          // Re-fetch when acts change (we filter client-side since acts don't have org_id)
-          fetchProgramData();
-        }
-      )
-      .subscribe();
+    // Listen to shows for this org in real-time
+    const showsQuery = query(collection(db, 'shows'), where('org_id', '==', orgId));
 
-    return () => {
-      supabase.removeChannel(showsChannel);
-    };
-  }, [orgId, fetchProgramData]);
+    const unsubShows = onSnapshot(showsQuery, async (showsSnap) => {
+      try {
+        if (showsSnap.empty) {
+          setRecitalData({});
+          setLoading(false);
+          return;
+        }
+
+        const shows = showsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        // Fetch all acts for these shows
+        const data = {};
+        for (const show of shows) {
+          const actsQuery = query(
+            collection(db, 'acts'),
+            where('show_id', '==', show.id),
+            orderBy('number', 'asc')
+          );
+          const actsSnap = await getDocs(actsQuery);
+          const acts = actsSnap.docs.map(d => ({
+            number: d.data().number,
+            title: d.data().title,
+            performers: d.data().performers || []
+          }));
+
+          data[show.id] = {
+            id: show.id,
+            label: show.label,
+            acts
+          };
+        }
+
+        console.log(`Program Data Loaded for Org [${orgId}]:`, Object.keys(data));
+        setRecitalData(data);
+      } catch (err) {
+        console.error("Firestore Program Error:", err);
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    return () => unsubShows();
+  }, [orgId]);
 
   // 2. Listen for "Now Performing" status for the specific show
   useEffect(() => {
@@ -107,19 +73,15 @@ export function useLiveTracker(orgId, selectedShowId) {
       return;
     }
 
-    // Initial fetch of status
-    const fetchStatus = async () => {
-      const { data: statusData } = await supabase
-        .from('show_status')
-        .select('current_act_number, is_tracking')
-        .eq('show_id', selectedShowId)
-        .single();
+    const statusRef = doc(db, 'show_status', selectedShowId);
 
-      if (!statusData) {
+    const unsubStatus = onSnapshot(statusRef, (snap) => {
+      if (!snap.exists()) {
         setCurrentAct({ number: 1, title: 'Not Started', isTracking: false });
         return;
       }
 
+      const statusData = snap.data();
       const acts = recitalData[selectedShowId]?.acts || [];
       const act = acts.find(a => a.number === statusData.current_act_number);
 
@@ -128,63 +90,33 @@ export function useLiveTracker(orgId, selectedShowId) {
         title: act ? act.title : 'Act not found',
         isTracking: statusData.is_tracking || false
       });
-    };
+    });
 
-    fetchStatus();
-
-    // Subscribe to realtime status changes
-    const statusChannel = supabase
-      .channel(`status-${selectedShowId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'show_status', filter: `show_id=eq.${selectedShowId}` },
-        (payload) => {
-          const statusData = payload.new;
-          if (!statusData) return;
-
-          const acts = recitalData[selectedShowId]?.acts || [];
-          const act = acts.find(a => a.number === statusData.current_act_number);
-
-          setCurrentAct({
-            number: statusData.current_act_number,
-            title: act ? act.title : 'Act not found',
-            isTracking: statusData.is_tracking || false
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(statusChannel);
-    };
+    return () => unsubStatus();
   }, [orgId, selectedShowId, recitalData]);
 
   // --- Persistence Actions ---
   const updateActNumber = async (num) => {
     if (!orgId || !selectedShowId) return;
 
-    await supabase
-      .from('show_status')
-      .upsert({
-        show_id: selectedShowId,
-        org_id: orgId,
-        current_act_number: num,
-        is_tracking: true,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'show_id' });
+    await setDoc(doc(db, 'show_status', selectedShowId), {
+      show_id: selectedShowId,
+      org_id: orgId,
+      current_act_number: num,
+      is_tracking: true,
+      updated_at: new Date().toISOString()
+    }, { merge: true });
   };
 
   const toggleTracking = async () => {
     if (!orgId || !selectedShowId) return;
 
-    await supabase
-      .from('show_status')
-      .upsert({
-        show_id: selectedShowId,
-        org_id: orgId,
-        is_tracking: !currentAct.isTracking,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'show_id' });
+    await setDoc(doc(db, 'show_status', selectedShowId), {
+      show_id: selectedShowId,
+      org_id: orgId,
+      is_tracking: !currentAct.isTracking,
+      updated_at: new Date().toISOString()
+    }, { merge: true });
   };
 
   return {

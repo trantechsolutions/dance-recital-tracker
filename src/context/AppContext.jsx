@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase, authorizedUsers } from '../supabase';
+import { auth, db, authorizedUsers } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const AppContext = createContext();
 
@@ -25,39 +27,18 @@ export function AppProvider({ children }) {
       }
     }, 5000);
 
-    // 1. Check current session on mount
-    const initAuth = async () => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) console.error("[Auth] getSession error:", error.message);
-        if (session?.user) {
-          await handleUserLogin(session.user);
-        }
-      } catch (err) {
-        console.error("[Auth] initAuth failed:", err);
-      } finally {
-        if (isMounted) {
-          clearTimeout(safetyTimer);
-          setIsAuthChecking(false);
-        }
-      }
-    };
-
-    initAuth();
-
-    // 2. Listen for auth state changes (including INITIAL_SESSION in Supabase v2)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      try {
-        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
-          await handleUserLogin(session.user);
-        } else if (event === 'SIGNED_OUT') {
+        if (firebaseUser) {
+          await handleUserLogin(firebaseUser);
+        } else {
           setUser(null);
           setIsAuthorized(false);
           setIsSuperAdmin(false);
           setFavorites(new Set());
         }
       } catch (err) {
-        console.error("[Auth] onAuthStateChange error:", err);
+        console.error("[Auth] onAuthStateChanged error:", err);
       } finally {
         if (isMounted) {
           clearTimeout(safetyTimer);
@@ -69,7 +50,7 @@ export function AppProvider({ children }) {
     return () => {
       isMounted = false;
       clearTimeout(safetyTimer);
-      subscription.unsubscribe();
+      unsubscribe();
     };
   }, []);
 
@@ -80,29 +61,20 @@ export function AppProvider({ children }) {
     setIsAuthorized(isSuper);
 
     // Fetch user profile & favorites
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('favorites')
-      .eq('id', u.id)
-      .single();
+    const profileRef = doc(db, 'user_profiles', u.uid);
+    const profileSnap = await getDoc(profileRef);
 
-    if (profile?.favorites) {
-      setFavorites(new Set(profile.favorites));
+    if (profileSnap.exists() && profileSnap.data().favorites) {
+      setFavorites(new Set(profileSnap.data().favorites));
     } else {
       setFavorites(new Set());
     }
 
     // Upsert user profile with login timestamp
-    await supabase
-      .from('user_profiles')
-      .upsert({
-        id: u.id,
-        email: u.email,
-        last_login: new Date().toISOString()
-      }, { onConflict: 'id' })
-      .then(({ error }) => {
-        if (error) console.error("Error saving user profile", error);
-      });
+    await setDoc(profileRef, {
+      email: u.email,
+      last_login: new Date().toISOString()
+    }, { merge: true });
   };
 
   // --- Org ID Sync ---
@@ -127,13 +99,9 @@ export function AppProvider({ children }) {
       else next.add(name);
 
       const newFavArray = Array.from(next);
-      supabase
-        .from('user_profiles')
-        .update({ favorites: newFavArray })
-        .eq('id', user.id)
-        .then(({ error }) => {
-          if (error) console.error("Failed to sync favorites:", error);
-        });
+      const profileRef = doc(db, 'user_profiles', user.uid);
+      setDoc(profileRef, { favorites: newFavArray }, { merge: true })
+        .catch(err => console.error("Failed to sync favorites:", err));
 
       return next;
     });

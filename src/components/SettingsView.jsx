@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Sun, Moon, Monitor, LogOut, Info, ChevronRight, User, Building2, AlertCircle } from 'lucide-react';
 import { marked } from 'marked';
-import { supabase } from '../supabase';
+import { auth, googleProvider } from '../firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signOut } from 'firebase/auth';
 import { clsx } from 'clsx';
 
 export default function SettingsView() {
@@ -40,13 +41,11 @@ export default function SettingsView() {
     e.preventDefault();
     setAuthError('');
     try {
-      let result;
       if (isRegistering) {
-        result = await supabase.auth.signUp({ email, password });
+        await createUserWithEmailAndPassword(auth, email, password);
       } else {
-        result = await supabase.auth.signInWithPassword({ email, password });
+        await signInWithEmailAndPassword(auth, email, password);
       }
-      if (result.error) throw result.error;
       setEmail('');
       setPassword('');
     } catch (err) {
@@ -56,18 +55,16 @@ export default function SettingsView() {
 
   const handleGoogleSignIn = async () => {
     setAuthError('');
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin + (import.meta.env.BASE_URL || '/')
-      }
-    });
-    if (error) setAuthError(error.message);
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (err) {
+      setAuthError(err.message);
+    }
   };
 
   const handleSignOut = async () => {
     clearSkipLogin();
-    await supabase.auth.signOut();
+    await signOut(auth);
   };
 
   return (
@@ -77,7 +74,7 @@ export default function SettingsView() {
       {/* Organization Section */}
       <section className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
         <h3 className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest">Organization</h3>
-        <button 
+        <button
           onClick={() => {
             if(window.confirm("Are you sure you want to switch studios? This will clear your currently selected show.")) {
               if (setOrgId) setOrgId(null);
@@ -111,24 +108,24 @@ export default function SettingsView() {
                 <AlertCircle size={16} /> {authError}
               </div>
             )}
-            
+
             <form onSubmit={handleEmailAuth} className="space-y-3">
-              <input 
-                type="email" 
-                placeholder="Email address" 
+              <input
+                type="email"
+                placeholder="Email address"
                 required
                 className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-xl dark:text-white border-none outline-none focus:ring-2 focus:ring-pink-500 text-sm"
                 value={email} onChange={e => setEmail(e.target.value)}
               />
-              <input 
-                type="password" 
-                placeholder="Password" 
+              <input
+                type="password"
+                placeholder="Password"
                 required
                 minLength={6}
                 className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-xl dark:text-white border-none outline-none focus:ring-2 focus:ring-pink-500 text-sm"
                 value={password} onChange={e => setPassword(e.target.value)}
               />
-              <button 
+              <button
                 type="submit"
                 className="w-full py-4 bg-pink-600 text-white rounded-xl font-bold transition-transform active:scale-95 shadow-lg shadow-pink-500/20"
               >
@@ -137,7 +134,7 @@ export default function SettingsView() {
             </form>
 
             <div className="flex flex-col gap-3 pt-2">
-              <button 
+              <button
                 type="button"
                 onClick={() => { setIsRegistering(!isRegistering); setAuthError(''); }}
                 className="text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white"
@@ -151,7 +148,7 @@ export default function SettingsView() {
                 <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
               </div>
 
-              <button 
+              <button
                 onClick={handleGoogleSignIn}
                 className="w-full py-3 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
               >
@@ -168,7 +165,7 @@ export default function SettingsView() {
                 Favorites backing up to cloud
               </p>
             </div>
-            <button 
+            <button
               onClick={handleSignOut}
               className="text-red-500 p-4 bg-red-50 dark:bg-red-900/20 rounded-xl hover:bg-red-100 transition-colors"
               title="Sign Out"
@@ -191,7 +188,7 @@ export default function SettingsView() {
 
       {/* Version Info */}
       <section>
-        <button 
+        <button
           onClick={() => setShowLog(!showLog)}
           className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl flex justify-between items-center shadow-sm"
         >
@@ -200,12 +197,12 @@ export default function SettingsView() {
           </div>
           <ChevronRight size={18} className={clsx("transition-transform", showLog && "rotate-90")} />
         </button>
-        
+
         {showLog && (
           <div className="mt-4 p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-inner">
-            <div 
-              className="prose prose-sm prose-pink dark:prose-invert max-w-none" 
-              dangerouslySetInnerHTML={{ __html: marked.parse(changelog || '') }} 
+            <div
+              className="prose prose-sm prose-pink dark:prose-invert max-w-none"
+              dangerouslySetInnerHTML={{ __html: marked.parse(changelog || '') }}
             />
           </div>
         )}
@@ -216,12 +213,12 @@ export default function SettingsView() {
 
 function ThemeOption({ active, onClick, icon, label }) {
   return (
-    <button 
-      onClick={onClick} 
+    <button
+      onClick={onClick}
       className={clsx(
         "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
-        active 
-          ? "border-pink-600 bg-pink-50 dark:bg-pink-900/20 text-pink-600 shadow-inner" 
+        active
+          ? "border-pink-600 bg-pink-50 dark:bg-pink-900/20 text-pink-600 shadow-inner"
           : "border-slate-100 dark:border-slate-700 text-slate-400 grayscale opacity-70"
       )}
     >

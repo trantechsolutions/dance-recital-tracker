@@ -1,17 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  Save, Calendar, Users, Plus, Trash2, Database, 
+import {
+  Save, Calendar, Plus, Trash2, Database,
   AlertCircle, X, Check, GripVertical, Building2, Shield, User as UserIcon, RefreshCw
 } from 'lucide-react';
-import { supabase } from '../../supabase';
+import { db } from '../../firebase';
+import { collection, doc, getDoc, getDocs, setDoc, query, where, orderBy, writeBatch } from 'firebase/firestore';
 import { clsx } from 'clsx';
-import { generateMockData } from '../../utils/mockData';
 import Papa from 'papaparse';
 
 // DND Kit Imports
 import {
-  DndContext, closestCenter, KeyboardSensor, PointerSensor, 
+  DndContext, closestCenter, KeyboardSensor, PointerSensor,
   useSensor, useSensors, TouchSensor
 } from '@dnd-kit/core';
 import {
@@ -21,11 +21,11 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 export default function AdminDashboard({ recitalData, setRecitalData }) {
-  const { user, isSuperAdmin, orgId, setOrgId } = useApp();
+  const { isSuperAdmin, orgId, setOrgId } = useApp();
 
   const [selectedShowId, setSelectedShowId] = useState('');
   const [editData, setEditData] = useState(null);
-  
+
   // Organization State
   const [orgData, setOrgData] = useState({ name: '', admins: [] });
   const [isCreatingOrg, setIsCreatingOrg] = useState(false);
@@ -33,7 +33,6 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
   const [newOrgAdminEmail, setNewOrgAdminEmail] = useState('');
 
   // UI State
-  const [migrationStatus, setMigrationStatus] = useState({ loading: false, error: null });
   const [isAddingShow, setIsAddingShow] = useState(false);
   const [newShowForm, setNewShowForm] = useState({ date: '', time: '', label: '' });
   const [toast, setToast] = useState(null);
@@ -41,7 +40,7 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
   // Users Table State
   const [appUsers, setAppUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  
+
   const [activeAdminTab, setActiveAdminTab] = useState(orgId ? 'shows' : 'studio');
 
   const sensors = useSensors(
@@ -53,13 +52,8 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
   useEffect(() => {
     const fetchOrg = async () => {
       if (!orgId) return;
-      const { data, error } = await supabase
-        .from('organizations')
-        .select('name, admins')
-        .eq('id', orgId)
-        .single();
-      
-      if (data) setOrgData(data);
+      const snap = await getDoc(doc(db, 'organizations', orgId));
+      if (snap.exists()) setOrgData(snap.data());
     };
     fetchOrg();
   }, [orgId]);
@@ -96,19 +90,25 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
             performers: row.performers ? row.performers.split(';').map(p => p.trim()) : []
           }));
 
-          // Delete existing acts for this show, then insert new ones
-          await supabase.from('acts').delete().eq('show_id', selectedShowId);
-          const { error } = await supabase.from('acts').insert(newActs);
+          // Delete existing acts for this show
+          const existingActs = await getDocs(query(collection(db, 'acts'), where('show_id', '==', selectedShowId)));
+          const batch = writeBatch(db);
+          existingActs.docs.forEach(d => batch.delete(d.ref));
 
-          if (error) throw error;
+          // Insert new acts
+          newActs.forEach(act => {
+            const actRef = doc(collection(db, 'acts'));
+            batch.set(actRef, act);
+          });
+          await batch.commit();
 
           showToast(`Successfully uploaded ${newActs.length} acts!`, "success");
-          
+
           // Refresh local state
           setRecitalData(prev => ({
             ...prev,
-            [selectedShowId]: { 
-              ...prev[selectedShowId], 
+            [selectedShowId]: {
+              ...prev[selectedShowId],
               acts: newActs.map(a => ({ number: a.number, title: a.title, performers: a.performers }))
             }
           }));
@@ -125,29 +125,22 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
     try {
       const formattedId = newOrgForm.id.toLowerCase().replace(/[^a-z0-9-]/g, '-');
       const admins = newOrgForm.adminEmail ? [newOrgForm.adminEmail] : [];
-      
-      const { error } = await supabase
-        .from('organizations')
-        .insert({ id: formattedId, name: newOrgForm.name, admins });
 
-      if (error) throw error;
+      await setDoc(doc(db, 'organizations', formattedId), {
+        name: newOrgForm.name,
+        admins
+      });
 
       showToast("Studio Created Successfully!", "success");
       setIsCreatingOrg(false);
       setNewOrgForm({ id: '', name: '', adminEmail: '' });
-      if (setOrgId) setOrgId(formattedId); 
+      if (setOrgId) setOrgId(formattedId);
     } catch (e) { showToast(e.message, "error"); }
   };
 
   const handleUpdateOrgAdmins = async (newAdmins) => {
     try {
-      const { error } = await supabase
-        .from('organizations')
-        .update({ admins: newAdmins })
-        .eq('id', orgId);
-
-      if (error) throw error;
-
+      await setDoc(doc(db, 'organizations', orgId), { admins: newAdmins }, { merge: true });
       setOrgData({ ...orgData, admins: newAdmins });
       showToast("Studio admins updated", "success");
     } catch (e) { showToast(e.message, "error"); }
@@ -158,13 +151,8 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
     if (!isSuperAdmin) return;
     setLoadingUsers(true);
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('id, email, favorites, last_login')
-        .order('last_login', { ascending: false });
-
-      if (error) throw error;
-      setAppUsers(data || []);
+      const snap = await getDocs(query(collection(db, 'user_profiles'), orderBy('last_login', 'desc')));
+      setAppUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { showToast(e.message, 'error'); }
     finally { setLoadingUsers(false); }
   };
@@ -183,67 +171,33 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
       }));
 
       // 1. Upsert the show record
-      const { error: showError } = await supabase
-        .from('shows')
-        .upsert({ id: editData.id, org_id: orgId, label: editData.label }, { onConflict: 'id' });
-
-      if (showError) throw showError;
+      await setDoc(doc(db, 'shows', editData.id), {
+        org_id: orgId,
+        label: editData.label
+      });
 
       // 2. Replace all acts: delete existing, then insert new
-      await supabase.from('acts').delete().eq('show_id', editData.id);
-      
-      if (cleanedActs.length > 0) {
-        const actsToInsert = cleanedActs.map(act => ({
-          show_id: editData.id,
-          number: act.number,
-          title: act.title,
-          performers: act.performers
-        }));
+      const existingActs = await getDocs(query(collection(db, 'acts'), where('show_id', '==', editData.id)));
+      const batch = writeBatch(db);
+      existingActs.docs.forEach(d => batch.delete(d.ref));
 
-        const { error: actsError } = await supabase.from('acts').insert(actsToInsert);
-        if (actsError) throw actsError;
+      if (cleanedActs.length > 0) {
+        cleanedActs.forEach(act => {
+          const actRef = doc(collection(db, 'acts'));
+          batch.set(actRef, {
+            show_id: editData.id,
+            number: act.number,
+            title: act.title,
+            performers: act.performers
+          });
+        });
       }
+      await batch.commit();
 
       const dataToSave = { ...editData, acts: cleanedActs };
       setRecitalData(prev => ({ ...prev, [editData.id]: dataToSave }));
       showToast("Changes saved", "success");
     } catch (err) { showToast(err.message, "error"); }
-  };
-
-  const runMigration = async () => {
-    setMigrationStatus({ loading: true, error: null });
-    try {
-      const mockData = generateMockData();
-      
-      for (const key of Object.keys(mockData)) {
-        const show = mockData[key];
-        
-        // Insert show
-        await supabase
-          .from('shows')
-          .upsert({ id: show.id, org_id: orgId, label: show.label }, { onConflict: 'id' });
-
-        // Delete existing acts then insert new
-        await supabase.from('acts').delete().eq('show_id', show.id);
-        
-        if (show.acts.length > 0) {
-          const actsToInsert = show.acts.map(act => ({
-            show_id: show.id,
-            number: act.number,
-            title: act.title,
-            performers: act.performers
-          }));
-          await supabase.from('acts').insert(actsToInsert);
-        }
-      }
-
-      setRecitalData(mockData);
-      showToast("Mock Data Synchronized!", "success");
-      setMigrationStatus({ loading: false, error: null });
-    } catch (e) { 
-      setMigrationStatus({ loading: false, error: e.message }); 
-      showToast(e.message, "error");
-    }
   };
 
   const updateAct = (index, field, value) => {
@@ -325,22 +279,22 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
 
             {isCreatingOrg ? (
               <div className="space-y-4 bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <input 
-                  type="text" 
-                  placeholder="Studio Name" 
-                  className="w-full p-4 rounded-xl border-none outline-none focus:ring-2 focus:ring-pink-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm transition-colors" 
-                  value={newOrgForm.name} 
-                  onChange={e => setNewOrgForm({...newOrgForm, name: e.target.value})} 
+                <input
+                  type="text"
+                  placeholder="Studio Name"
+                  className="w-full p-4 rounded-xl border-none outline-none focus:ring-2 focus:ring-pink-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm transition-colors"
+                  value={newOrgForm.name}
+                  onChange={e => setNewOrgForm({...newOrgForm, name: e.target.value})}
                 />
-                <input 
-                  type="text" 
-                  placeholder="database-id" 
-                  className="w-full p-4 rounded-xl border-none outline-none focus:ring-2 focus:ring-pink-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm transition-colors" 
-                  value={newOrgForm.id} 
-                  onChange={e => setNewOrgForm({...newOrgForm, id: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-')})} 
+                <input
+                  type="text"
+                  placeholder="database-id"
+                  className="w-full p-4 rounded-xl border-none outline-none focus:ring-2 focus:ring-pink-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm transition-colors"
+                  value={newOrgForm.id}
+                  onChange={e => setNewOrgForm({...newOrgForm, id: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-')})}
                 />
-                <button 
-                  onClick={handleCreateOrg} 
+                <button
+                  onClick={handleCreateOrg}
                   className="w-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 p-4 rounded-xl font-black shadow-md active:scale-95 transition-all mt-2"
                 >
                   Create Studio
@@ -352,13 +306,13 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
                   <Shield size={16} className="text-slate-400" />
                   <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Authorized Administrators</label>
                 </div>
-                
+
                 <div className="space-y-2">
                   {(orgData.admins || []).map(email => (
                     <div key={email} className="flex justify-between items-center bg-slate-50 dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                       <span className="font-bold text-sm dark:text-white ml-2">{email}</span>
-                      <button 
-                        onClick={() => handleUpdateOrgAdmins(orgData.admins.filter(e => e !== email))} 
+                      <button
+                        onClick={() => handleUpdateOrgAdmins(orgData.admins.filter(e => e !== email))}
                         className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-lg transition-colors"
                       >
                         <X size={16} />
@@ -368,16 +322,16 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
                 </div>
 
                 <div className="flex gap-2 mt-4">
-                  <input 
-                    type="email" 
-                    placeholder="Add admin email..." 
-                    className="flex-1 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl dark:text-white border border-slate-200 dark:border-slate-700 outline-none focus:border-pink-500 text-sm" 
-                    value={newOrgAdminEmail} 
-                    onChange={e => setNewOrgAdminEmail(e.target.value)} 
-                    onKeyDown={e => { if (e.key === 'Enter' && newOrgAdminEmail.trim()) { handleUpdateOrgAdmins([...(orgData.admins || []), newOrgAdminEmail.trim()]); setNewOrgAdminEmail(''); }}} 
+                  <input
+                    type="email"
+                    placeholder="Add admin email..."
+                    className="flex-1 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl dark:text-white border border-slate-200 dark:border-slate-700 outline-none focus:border-pink-500 text-sm"
+                    value={newOrgAdminEmail}
+                    onChange={e => setNewOrgAdminEmail(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && newOrgAdminEmail.trim()) { handleUpdateOrgAdmins([...(orgData.admins || []), newOrgAdminEmail.trim()]); setNewOrgAdminEmail(''); }}}
                   />
-                  <button 
-                    onClick={() => { if (newOrgAdminEmail.trim()) { handleUpdateOrgAdmins([...(orgData.admins || []), newOrgAdminEmail.trim()]); setNewOrgAdminEmail(''); }}} 
+                  <button
+                    onClick={() => { if (newOrgAdminEmail.trim()) { handleUpdateOrgAdmins([...(orgData.admins || []), newOrgAdminEmail.trim()]); setNewOrgAdminEmail(''); }}}
                     className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white px-5 rounded-xl font-bold text-sm hover:bg-slate-300 transition-colors"
                   >
                     Add
@@ -430,51 +384,51 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                   <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Display Title</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. 2026 Spring Recital" 
-                    className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl text-slate-900 dark:text-white border-none mt-1 text-lg font-bold outline-none focus:ring-2 focus:ring-pink-500 transition-colors" 
-                    value={newShowForm.label} 
-                    onChange={e => setNewShowForm({...newShowForm, label: e.target.value})} 
+                  <input
+                    type="text"
+                    placeholder="e.g. 2026 Spring Recital"
+                    className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl text-slate-900 dark:text-white border-none mt-1 text-lg font-bold outline-none focus:ring-2 focus:ring-pink-500 transition-colors"
+                    value={newShowForm.label}
+                    onChange={e => setNewShowForm({...newShowForm, label: e.target.value})}
                   />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Date</label>
-                  <input 
-                    type="date" 
-                    className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl text-slate-900 dark:text-white border-none mt-1 outline-none focus:ring-2 focus:ring-pink-500 transition-colors" 
-                    value={newShowForm.date} 
-                    onChange={e => setNewShowForm({...newShowForm, date: e.target.value})} 
+                  <input
+                    type="date"
+                    className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl text-slate-900 dark:text-white border-none mt-1 outline-none focus:ring-2 focus:ring-pink-500 transition-colors"
+                    value={newShowForm.date}
+                    onChange={e => setNewShowForm({...newShowForm, date: e.target.value})}
                   />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Time</label>
-                  <input 
-                    type="time" 
-                    className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl text-slate-900 dark:text-white border-none mt-1 outline-none focus:ring-2 focus:ring-pink-500 transition-colors" 
-                    value={newShowForm.time} 
-                    onChange={e => setNewShowForm({...newShowForm, time: e.target.value})} 
+                  <input
+                    type="time"
+                    className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl text-slate-900 dark:text-white border-none mt-1 outline-none focus:ring-2 focus:ring-pink-500 transition-colors"
+                    value={newShowForm.time}
+                    onChange={e => setNewShowForm({...newShowForm, time: e.target.value})}
                   />
                 </div>
               </div>
-              <button 
+              <button
                 onClick={async () => {
                   const { date, time, label } = newShowForm;
                   if (!date || !time || !label) return showToast("Please fill out all fields", "error");
-                  
+
                   const id = new Date(`${date}T${time}`).toISOString();
-                  
+
                   // Initialize the new show locally
                   setRecitalData(prev => ({ ...prev, [id]: { id, label, acts: [] } }));
-                  
+
                   // Select the new show and close the form
                   setSelectedShowId(id);
                   setIsAddingShow(false);
-                  
+
                   // Reset form fields
                   setNewShowForm({ date: '', time: '', label: '' });
                   showToast("Performance Created locally! Add acts and hit Save.", "success");
-                }} 
+                }}
                 className="w-full bg-pink-600 text-white p-5 rounded-2xl font-black mt-8 shadow-lg shadow-pink-500/30 active:scale-95 transition-transform"
               >
                 Create Performance
@@ -483,9 +437,9 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
           ) : (
             <div className="bg-white dark:bg-slate-800 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-700">
               <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block">Selected Show</label>
-              <select 
-                className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl font-bold dark:text-white border-none appearance-none outline-none focus:ring-2 focus:ring-pink-500" 
-                value={selectedShowId} 
+              <select
+                className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl font-bold dark:text-white border-none appearance-none outline-none focus:ring-2 focus:ring-pink-500"
+                value={selectedShowId}
                 onChange={e => setSelectedShowId(e.target.value)}
               >
                 <option value="">-- Choose Performance --</option>
