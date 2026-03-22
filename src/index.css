@@ -7,7 +7,7 @@
     -webkit-tap-highlight-color: transparent;
     scroll-behavior: smooth;
   }
-  
+
   body {
     @apply antialiased text-slate-900 bg-slate-50 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300;
   }
@@ -22,4 +22,141 @@
 }
 .dark ::-webkit-scrollbar-thumb {
   @apply bg-slate-700 rounded-full;
+}
+
+/* Hide scrollbar for dropdown menus */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ========= Animations ========= */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out both;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.4s ease-out both;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease-out both;
+}
+
+/* Staggered children animations */
+.stagger-children > * {
+  animation: fadeInUp 0.4s ease-out both;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+.stagger-children > *:nth-child(7) { animation-delay: 300ms; }
+.stagger-children > *:nth-child(8) { animation-delay: 350ms; }
+.stagger-children > *:nth-child(9) { animation-delay: 400ms; }
+.stagger-children > *:nth-child(10) { animation-delay: 450ms; }
+
+/* ========= Print Styles ========= */
+@media print {
+  /* Hide everything except the program */
+  nav,
+  .sticky-tracker,
+  button,
+  .no-print,
+  [class*="fixed"],
+  [class*="md:w-72"],
+  [class*="bottom-0"] {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt;
+  }
+
+  .dark {
+    background: white !important;
+    color: black !important;
+  }
+
+  .print-program {
+    display: block !important;
+  }
+
+  .print-program > div {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px !important;
+    padding: 12px !important;
+    margin-bottom: 8px !important;
+    background: white !important;
+    box-shadow: none !important;
+  }
+
+  /* Ensure text is visible in print */
+  * {
+    color: black !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  .print-program > div .text-pink-600,
+  .print-program > div .text-pink-400 {
+    font-weight: bold !important;
+  }
+
+  /* Remove max-width constraints */
+  .max-w-4xl {
+    max-width: 100% !important;
+  }
 }

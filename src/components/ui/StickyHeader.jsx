@@ -1,6 +1,5 @@
 import React from 'react';
 import { Minus, Plus } from 'lucide-react';
-import { clsx } from 'clsx';
 
 export default function StickyHeader({ currentAct, isAuthorized, onUpdate }) {
   // Only show if tracking is active

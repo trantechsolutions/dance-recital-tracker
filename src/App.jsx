@@ -2,18 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useApp } from './context/AppContext';
 import { useLiveTracker } from './hooks/useLiveTracker';
-import { clsx } from 'clsx';
 
 // Icons
-import { 
-  List, Search, Users, Settings, ShieldAlert, 
-  Building2, LogOut, User 
+import {
+  List, Search, Users, Settings, ShieldAlert,
+  Building2, LogOut, User, Heart
 } from 'lucide-react';
 
 // Components
 import ProgramView from './components/program/ProgramView';
 import SearchActView from './components/search/SearchActView';
 import SearchDancerView from './components/search/SearchDancerView';
+import MyScheduleView from './components/schedule/MyScheduleView';
 import SettingsView from './components/SettingsView';
 import AdminDashboard from './components/admin/AdminDashboard';
 import StickyHeader from './components/ui/StickyHeader';
@@ -23,6 +23,7 @@ import LiveTrackerHero from './components/program/LiveTrackerHero';
 import StudioSelector from './components/StudioSelector';
 import LoginScreen from './components/LoginScreen';
 import ShowSelector from './components/ui/ShowSelector';
+import FloatingButtons from './components/ui/FloatingButtons';
 
 // Helper component
 function LoadingScreen({ text }) {
@@ -42,19 +43,19 @@ export default function App() {
   const [searchParams] = useSearchParams();
 
   // 1. Hook into Context
-  const { 
-    user, isAuthorized, isSuperAdmin, isAuthChecking, 
-    hasSkippedLogin, skipLogin, favorites, toggleFavorite, 
-    orgId, setOrgId 
+  const {
+    user, isAuthorized, isSuperAdmin, isAuthChecking,
+    hasSkippedLogin, skipLogin, favorites, toggleFavorite,
+    orgId, setOrgId
   } = useApp();
 
   // 2. Initialize show locally from URL (for deep links)
   const [selectedShow, setSelectedShow] = useState(() => searchParams.get('show') || '');
 
   // 3. Track Live Data
-  const { 
-    recitalData, currentAct, loading, 
-    setRecitalData, updateActNumber, toggleTracking 
+  const {
+    recitalData, currentAct, loading,
+    setRecitalData, updateActNumber, toggleTracking
   } = useLiveTracker(orgId, selectedShow);
 
   // 4. Handle deep-linked Organization
@@ -67,7 +68,7 @@ export default function App() {
 
   const handleSwitchStudio = () => {
     setOrgId(null);
-    setSelectedShow(''); // Clear local state instead of URL
+    setSelectedShow('');
     navigate('/');
   };
 
@@ -88,6 +89,9 @@ export default function App() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
+  // Favorites count
+  const favCount = favorites?.size || 0;
+
   // --- UI WATERFALL ---
 
   if (isAuthChecking) return <LoadingScreen text="Loading" />;
@@ -99,7 +103,7 @@ export default function App() {
       <div className="relative min-h-screen">
         {isSuperAdmin && (
           <div className="absolute top-4 right-4 md:top-8 md:right-8 z-50 animate-in fade-in zoom-in duration-500">
-            <button 
+            <button
               onClick={() => navigate('/admin')}
               className="flex items-center gap-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-5 py-3 rounded-2xl font-black shadow-2xl hover:scale-105 transition-all"
             >
@@ -109,7 +113,6 @@ export default function App() {
         )}
         <StudioSelector onSelect={(id) => {
           setOrgId(id);
-          // Immediately embed the org in the URL and go to the home page
           navigate(`/?org=${id}`);
         }} />
       </div>
@@ -119,17 +122,17 @@ export default function App() {
   if (loading) return <LoadingScreen text="Syncing Cloud" />;
 
   const isHideSelector = location.pathname.startsWith('/admin') || location.pathname.startsWith('/settings');
-  
-  const commonProps = { 
-    showData: selectedShow ? recitalData?.[selectedShow] : null, 
+
+  const commonProps = {
+    showData: selectedShow ? recitalData?.[selectedShow] : null,
     selectedShow,
     currentAct, isAuthorized, favorites, toggleFavorite, user,
-    onUpdate: updateActNumber, onToggle: toggleTracking 
+    onUpdate: updateActNumber, onToggle: toggleTracking
   };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300 flex flex-col md:flex-row">
-      
+
       {/* --- DESKTOP SIDEBAR --- */}
       <nav className="hidden md:flex md:w-72 md:flex-col md:fixed md:h-full bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-8 z-50">
         <div className="mb-8">
@@ -140,18 +143,19 @@ export default function App() {
         </div>
 
         {orgId && (
-          <button 
+          <button
             onClick={handleSwitchStudio}
             className="mb-8 flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-pink-600 transition-colors bg-slate-100 dark:bg-slate-900 px-4 py-2 rounded-xl"
           >
             <Building2 size={14} /> Switch Studio
           </button>
         )}
-        
+
         <div className="space-y-2 flex-1">
           <SidebarLink to="/" active={location.pathname === '/'} icon={<List size={20}/>} label="Program View" />
           <SidebarLink to="/search-acts" active={location.pathname === '/search-acts'} icon={<Search size={20}/>} label="Search Acts" />
           <SidebarLink to="/search-dancers" active={location.pathname === '/search-dancers'} icon={<Users size={20}/>} label="Dancer Search" />
+          <SidebarLink to="/my-schedule" active={location.pathname === '/my-schedule'} icon={<Heart size={20}/>} label="My Schedule" badge={favCount} />
         </div>
 
         <div className="mt-auto pt-6 space-y-2 border-t border-slate-200 dark:border-slate-700">
@@ -159,7 +163,7 @@ export default function App() {
             <SidebarLink to="/admin" active={location.pathname === '/admin'} icon={<ShieldAlert size={20}/>} label="Admin Console" />
           )}
           <SidebarLink to="/settings" active={location.pathname === '/settings'} icon={<Settings size={20}/>} label="App Settings" />
-          
+
           {user && (
             <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl flex items-center gap-3 border border-slate-100 dark:border-slate-800 shadow-inner">
               <div className="w-10 h-10 bg-pink-100 dark:bg-pink-900/30 text-pink-600 rounded-full flex items-center justify-center shrink-0">
@@ -177,7 +181,7 @@ export default function App() {
       {/* --- MAIN CONTENT AREA --- */}
       <div className="flex-1 md:ml-72 min-h-screen pb-28 md:pb-12">
         <StickyHeader currentAct={currentAct} isAuthorized={isAuthorized} onUpdate={updateActNumber} />
-        
+
         <div className="max-w-4xl mx-auto px-4 md:px-12 pt-8">
           <header className="md:hidden flex flex-col gap-4 mb-8">
             <div className="flex justify-between items-center">
@@ -185,7 +189,7 @@ export default function App() {
                 {orgId ? orgId.replace(/-/g, ' ') : "Global Admin"}
               </h1>
               {orgId && (
-                <button 
+                <button
                   onClick={handleSwitchStudio}
                   className="p-2 bg-slate-200 dark:bg-slate-800 rounded-full text-slate-500 hover:text-pink-600 transition-colors shrink-0"
                   title="Switch Studio"
@@ -211,10 +215,10 @@ export default function App() {
           </header>
 
           {!isHideSelector && (
-             <ShowSelector 
-                recitalData={recitalData} 
-                selectedShow={selectedShow} 
-                setSelectedShow={setSelectedShow} 
+             <ShowSelector
+                recitalData={recitalData}
+                selectedShow={selectedShow}
+                setSelectedShow={setSelectedShow}
              />
           )}
 
@@ -222,34 +226,38 @@ export default function App() {
             {selectedShow && !isHideSelector && (
               <LiveTrackerHero currentAct={currentAct} isAuthorized={isAuthorized} onUpdate={updateActNumber} onToggle={toggleTracking} />
             )}
-            
+
             {/* The React Router Core Engine */}
             <Routes>
               <Route path="/" element={<ProgramView {...commonProps} />} />
               <Route path="/search-acts" element={<SearchActView {...commonProps} />} />
               <Route path="/search-dancers" element={<SearchDancerView {...commonProps} />} />
-              
+              <Route path="/my-schedule" element={<MyScheduleView {...commonProps} />} />
+
               {/* Protect the Admin Route */}
-              <Route 
-                path="/admin" 
-                element={isAuthorized ? <AdminDashboard recitalData={recitalData} setRecitalData={setRecitalData} /> : <Navigate to="/" />} 
+              <Route
+                path="/admin"
+                element={isAuthorized ? <AdminDashboard recitalData={recitalData} setRecitalData={setRecitalData} /> : <Navigate to="/" />}
               />
-              
+
               <Route path="/settings" element={<SettingsView />} />
-              
+
               {/* Catch-all to send bad URLs back home */}
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
-
           </main>
         </div>
       </div>
 
+      {/* --- FLOATING ACTION BUTTONS --- */}
+      <FloatingButtons currentAct={currentAct} />
+
       {/* --- MOBILE BOTTOM NAV --- */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex justify-around h-24 items-center px-4 z-40">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex justify-around h-24 items-center px-2 z-40">
         <NavButton to="/" active={location.pathname === '/'} icon={<List/>} label="Program" />
         <NavButton to="/search-acts" active={location.pathname === '/search-acts'} icon={<Search/>} label="Acts" />
         <NavButton to="/search-dancers" active={location.pathname === '/search-dancers'} icon={<Users/>} label="Dancers" />
+        <NavButton to="/my-schedule" active={location.pathname === '/my-schedule'} icon={<Heart/>} label="Schedule" badge={favCount} />
         {isAuthorized && <NavButton to="/admin" active={location.pathname === '/admin'} icon={<ShieldAlert/>} label="Admin" />}
         <NavButton to="/settings" active={location.pathname === '/settings'} icon={<Settings/>} label="Setup" />
       </nav>
