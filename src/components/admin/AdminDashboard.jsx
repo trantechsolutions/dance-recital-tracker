@@ -5,7 +5,7 @@ import {
   AlertCircle, X, Check, GripVertical, Building2, Shield, User as UserIcon, RefreshCw, Sparkles
 } from 'lucide-react';
 import { db } from '../../firebase';
-import { seedDatabase } from '../../utils/seedData';
+import { seedDatabase, clearSeedData } from '../../utils/seedData';
 import { collection, doc, getDoc, getDocs, setDoc, query, where, orderBy, writeBatch } from 'firebase/firestore';
 import { clsx } from 'clsx';
 import Papa from 'papaparse';
@@ -162,6 +162,23 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
       setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
       showToast("Seed failed: " + err.message, "error");
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  const handleClearSeedData = async () => {
+    if (!window.confirm("This will delete the 'Dancer\\'s Pointe' studio and ALL its shows and acts. Continue?")) return;
+    setIsSeeding(true);
+    setSeedLog([]);
+    try {
+      const result = await clearSeedData((msg) => {
+        setSeedLog(prev => [...prev, msg]);
+      });
+      showToast(`Cleared ${result.deleted} acts and ${result.shows} shows!`, "success");
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      showToast("Clear failed: " + err.message, "error");
     } finally {
       setIsSeeding(false);
     }
@@ -395,18 +412,32 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
                     ))}
                   </div>
                 )}
-                <button
-                  onClick={handleSeedData}
-                  disabled={isSeeding}
-                  className={clsx(
-                    "px-6 py-3 rounded-xl font-bold text-sm transition-all active:scale-95",
-                    isSeeding
-                      ? "bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-wait"
-                      : "bg-amber-500 text-white hover:bg-amber-600 shadow-md shadow-amber-500/20"
-                  )}
-                >
-                  {isSeeding ? 'Seeding...' : 'Seed Demo Data'}
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleSeedData}
+                    disabled={isSeeding}
+                    className={clsx(
+                      "px-6 py-3 rounded-xl font-bold text-sm transition-all active:scale-95",
+                      isSeeding
+                        ? "bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-wait"
+                        : "bg-amber-500 text-white hover:bg-amber-600 shadow-md shadow-amber-500/20"
+                    )}
+                  >
+                    {isSeeding ? 'Working...' : 'Seed Demo Data'}
+                  </button>
+                  <button
+                    onClick={handleClearSeedData}
+                    disabled={isSeeding}
+                    className={clsx(
+                      "px-6 py-3 rounded-xl font-bold text-sm transition-all active:scale-95",
+                      isSeeding
+                        ? "bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-wait"
+                        : "bg-red-500 text-white hover:bg-red-600 shadow-md shadow-red-500/20"
+                    )}
+                  >
+                    Clear Demo Data
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -1,5 +1,5 @@
 import { db } from '../firebase';
-import { collection, doc, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 
 const ORG_ID = 'dancers-pointe';
 
@@ -124,4 +124,42 @@ export async function seedDatabase(onProgress) {
     sundayActs: sundayActs.length,
     totalActs,
   };
+}
+
+export async function clearSeedData(onProgress) {
+  const log = (msg) => onProgress?.(msg);
+  let deleted = 0;
+
+  // 1. Delete acts for seeded shows
+  for (const show of shows) {
+    log(`Deleting acts for: ${show.label}...`);
+    const actsSnap = await getDocs(query(collection(db, 'acts'), where('show_id', '==', show.id)));
+    if (actsSnap.size > 0) {
+      const batch = writeBatch(db);
+      actsSnap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      deleted += actsSnap.size;
+    }
+  }
+
+  // 2. Delete shows
+  log('Deleting shows...');
+  for (const show of shows) {
+    await deleteDoc(doc(db, 'shows', show.id));
+  }
+
+  // 3. Delete show_status
+  log('Deleting show status...');
+  for (const show of shows) {
+    await deleteDoc(doc(db, 'show_status', show.id));
+  }
+
+  // 4. Delete organization from both collections
+  log('Deleting organization...');
+  await deleteDoc(doc(db, 'organizations', ORG_ID));
+  await deleteDoc(doc(db, 'test_organizations', ORG_ID));
+
+  log(`Done! Removed ${deleted} acts, ${shows.length} shows, and the organization.`);
+
+  return { deleted, shows: shows.length, orgId: ORG_ID };
 }
