@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Save, Calendar, Plus, Trash2, Database,
-  AlertCircle, X, Check, GripVertical, Building2, Shield, User as UserIcon, RefreshCw
+  AlertCircle, X, Check, GripVertical, Building2, Shield, User as UserIcon, RefreshCw, Sparkles
 } from 'lucide-react';
 import { db } from '../../firebase';
+import { seedDatabase } from '../../utils/seedData';
 import { collection, doc, getDoc, getDocs, setDoc, query, where, orderBy, writeBatch } from 'firebase/firestore';
 import { clsx } from 'clsx';
 import Papa from 'papaparse';
@@ -41,6 +42,8 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
   const [appUsers, setAppUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
+  const [isSeeding, setIsSeeding] = useState(false);
+  const [seedLog, setSeedLog] = useState([]);
   const [activeAdminTab, setActiveAdminTab] = useState(orgId ? 'shows' : 'studio');
 
   const sensors = useSensors(
@@ -144,6 +147,23 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
       showToast("Cache cleared successfully!", "success");
       // Optionally, you can reload the page to ensure the cache is fully cleared
       window.location.reload();
+    }
+  };
+
+  const handleSeedData = async () => {
+    if (!window.confirm("This will create a 'Dancer\\'s Pointe' studio with 2 shows and 35 acts of demo data. Continue?")) return;
+    setIsSeeding(true);
+    setSeedLog([]);
+    try {
+      const result = await seedDatabase((msg) => {
+        setSeedLog(prev => [...prev, msg]);
+      });
+      showToast(`Seeded ${result.totalActs} acts across ${result.shows} shows!`, "success");
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      showToast("Seed failed: " + err.message, "error");
+    } finally {
+      setIsSeeding(false);
     }
   };
 
@@ -353,6 +373,42 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Seed Demo Data Section */}
+          <div className="mt-6 p-6 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded-xl shrink-0">
+                <Sparkles size={24} />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-black dark:text-white mb-1">Seed Demo Data</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                  Populate Firestore with a &quot;Dancer&apos;s Pointe&quot; studio, 2 shows (Saturday &amp; Sunday), and 35 realistic acts with performers.
+                </p>
+                {seedLog.length > 0 && (
+                  <div className="mb-3 space-y-1">
+                    {seedLog.map((msg, i) => (
+                      <div key={i} className="text-[11px] font-mono text-slate-400 flex items-center gap-2">
+                        <Check size={12} className="text-emerald-500 shrink-0" /> {msg}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={handleSeedData}
+                  disabled={isSeeding}
+                  className={clsx(
+                    "px-6 py-3 rounded-xl font-bold text-sm transition-all active:scale-95",
+                    isSeeding
+                      ? "bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-wait"
+                      : "bg-amber-500 text-white hover:bg-amber-600 shadow-md shadow-amber-500/20"
+                  )}
+                >
+                  {isSeeding ? 'Seeding...' : 'Seed Demo Data'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
