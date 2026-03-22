@@ -168,14 +168,18 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
   };
 
   const handleClearSeedData = async () => {
-    if (!window.confirm("This will delete the 'Dancer\\'s Pointe' studio and ALL its shows and acts. Continue?")) return;
+    if (!window.confirm("This will delete the 'Dancer\\'s Pointe' studio, ALL its shows, acts, and remove related favorites from all users. Continue?")) return;
     setIsSeeding(true);
     setSeedLog([]);
     try {
       const result = await clearSeedData((msg) => {
         setSeedLog(prev => [...prev, msg]);
       });
-      showToast(`Cleared ${result.deleted} acts and ${result.shows} shows!`, "success");
+      showToast(`Cleared ${result.deleted} acts, ${result.shows} shows, and ${result.usersUpdated} user favorites!`, "success");
+      // Clear local org selection if it was the seeded org
+      if (orgId === 'dancers-pointe') {
+        setOrgId(null);
+      }
       setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
       showToast("Clear failed: " + err.message, "error");

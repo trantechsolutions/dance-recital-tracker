@@ -126,6 +126,21 @@ export async function seedDatabase(onProgress) {
   };
 }
 
+// Build a Set of all favoritable strings from the seeded data
+// so we can scrub them from user profiles on clear.
+function getSeededFavoriteKeys() {
+  const keys = new Set();
+  const allActs = [...saturdayActs, ...sundayActs];
+
+  for (const act of allActs) {
+    keys.add(`act-${act.number}`);
+    for (const p of act.performers) {
+      keys.add(p);
+    }
+  }
+  return keys;
+}
+
 export async function clearSeedData(onProgress) {
   const log = (msg) => onProgress?.(msg);
   let deleted = 0;
@@ -159,7 +174,27 @@ export async function clearSeedData(onProgress) {
   await deleteDoc(doc(db, 'organizations', ORG_ID));
   await deleteDoc(doc(db, 'test_organizations', ORG_ID));
 
-  log(`Done! Removed ${deleted} acts, ${shows.length} shows, and the organization.`);
+  // 5. Scrub seeded favorites from ALL user profiles
+  log('Cleaning favorites from user profiles...');
+  const seededKeys = getSeededFavoriteKeys();
+  let usersUpdated = 0;
 
-  return { deleted, shows: shows.length, orgId: ORG_ID };
+  const usersSnap = await getDocs(collection(db, 'user_profiles'));
+  for (const userDoc of usersSnap.docs) {
+    const data = userDoc.data();
+    const favs = data.favorites;
+    if (!Array.isArray(favs) || favs.length === 0) continue;
+
+    const cleaned = favs.filter(f => !seededKeys.has(f));
+
+    // Only write back if something was actually removed
+    if (cleaned.length !== favs.length) {
+      await setDoc(userDoc.ref, { favorites: cleaned }, { merge: true });
+      usersUpdated++;
+    }
+  }
+
+  log(`Done! Removed ${deleted} acts, ${shows.length} shows, and cleaned ${usersUpdated} user profile(s).`);
+
+  return { deleted, shows: shows.length, orgId: ORG_ID, usersUpdated };
 }
