@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
 import { collection, getDocs } from 'firebase/firestore';
+import { db, DB_PREFIX } from '../firebase';
 import { Building2, ChevronRight, Loader2 } from 'lucide-react';
 
 export default function StudioSelector({ onSelect }) {
@@ -10,8 +10,12 @@ export default function StudioSelector({ onSelect }) {
   useEffect(() => {
     const fetchOrganizations = async () => {
       try {
-        const snap = await getDocs(collection(db, 'organizations'));
-        setOrgs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const querySnapshot = await getDocs(collection(db, `${DB_PREFIX}organizations`));
+        const orgList = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setOrgs(orgList);
       } catch (err) {
         console.error("Error fetching organizations:", err);
       } finally {
@@ -25,7 +29,7 @@ export default function StudioSelector({ onSelect }) {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-6 transition-colors duration-300">
       <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-700">
-
+        
         <div className="text-center mb-10">
           <div className="w-20 h-20 bg-pink-100 dark:bg-pink-900/30 text-pink-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
             <Building2 size={40} />

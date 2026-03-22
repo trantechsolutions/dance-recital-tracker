@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, AlertCircle } from 'lucide-react';
 import { auth, googleProvider } from '../firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 
 export default function LoginScreen({ onSkip }) {
   const [email, setEmail] = useState('');
@@ -19,23 +19,14 @@ export default function LoginScreen({ onSkip }) {
         await signInWithEmailAndPassword(auth, email, password);
       }
     } catch (err) {
-      setAuthError(err.message);
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    setAuthError('');
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (err) {
-      setAuthError(err.message);
+      setAuthError(err.message.replace('Firebase: ', ''));
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-6 transition-colors duration-300">
       <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-700">
-
+        
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-pink-100 dark:bg-pink-900/30 text-pink-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
             <User size={40} />
@@ -55,25 +46,25 @@ export default function LoginScreen({ onSkip }) {
 
           <form onSubmit={handleEmailAuth} className="space-y-4">
             <div>
-              <input
-                type="email"
-                placeholder="Email address"
+              <input 
+                type="email" 
+                placeholder="Email address" 
                 required
                 className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-xl dark:text-white border-none outline-none focus:ring-2 focus:ring-pink-500"
                 value={email} onChange={e => setEmail(e.target.value)}
               />
             </div>
             <div>
-              <input
-                type="password"
-                placeholder="Password"
+              <input 
+                type="password" 
+                placeholder="Password" 
                 required
                 minLength={6}
                 className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-xl dark:text-white border-none outline-none focus:ring-2 focus:ring-pink-500"
                 value={password} onChange={e => setPassword(e.target.value)}
               />
             </div>
-            <button
+            <button 
               type="submit"
               className="w-full py-4 bg-pink-600 text-white rounded-xl font-black transition-transform active:scale-95 shadow-lg shadow-pink-500/20"
             >
@@ -82,7 +73,7 @@ export default function LoginScreen({ onSkip }) {
           </form>
 
           <div className="mt-4 text-center">
-            <button
+            <button 
               type="button"
               onClick={() => { setIsRegistering(!isRegistering); setAuthError(''); }}
               className="text-sm font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors"
@@ -97,14 +88,14 @@ export default function LoginScreen({ onSkip }) {
             <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
           </div>
 
-          <button
-            onClick={handleGoogleSignIn}
+          <button 
+            onClick={() => signInWithPopup(auth, googleProvider)}
             className="w-full py-4 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors mb-4"
           >
             <User size={18} /> Continue with Google
           </button>
-
-          <button
+          
+          <button 
             onClick={onSkip}
             className="w-full py-4 bg-transparent text-slate-500 dark:text-slate-400 rounded-xl font-bold hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
           >

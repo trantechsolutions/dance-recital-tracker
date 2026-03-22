@@ -138,6 +138,15 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
     } catch (e) { showToast(e.message, "error"); }
   };
 
+  const handleClearCache = () => {
+    if (window.confirm("Are you sure you want to clear the local cache? This will force a fresh download of all recital data.")) {
+      localStorage.removeItem('recitalData');
+      showToast("Cache cleared successfully!", "success");
+      // Optionally, you can reload the page to ensure the cache is fully cleared
+      window.location.reload();
+    }
+  };
+
   const handleUpdateOrgAdmins = async (newAdmins) => {
     try {
       await setDoc(doc(db, 'organizations', orgId), { admins: newAdmins }, { merge: true });
@@ -272,9 +281,14 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
           <div className="relative z-10">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-2xl font-black dark:text-white">{orgData.name || orgId || "Studio Setup"}</h3>
-              <button onClick={() => setIsCreatingOrg(!isCreatingOrg)} className="bg-pink-600 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase">
-                {isCreatingOrg ? "Cancel" : "+ New Studio"}
-              </button>
+              <div className="flex gap-3">
+                <button onClick={handleClearCache} className="bg-red-500 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase">
+                  Clear Cache
+                </button>
+                <button onClick={() => setIsCreatingOrg(!isCreatingOrg)} className="bg-pink-600 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase">
+                  {isCreatingOrg ? "Cancel" : "+ New Studio"}
+                </button>
+              </div>
             </div>
 
             {isCreatingOrg ? (
