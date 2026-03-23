@@ -58,18 +58,21 @@ export default function App() {
     setRecitalData, updateActNumber, toggleTracking
   } = useLiveTracker(orgId, selectedShow);
 
-  // 4. Handle deep-linked Organization
+  // 4. Handle deep-linked Organization (only on initial load)
+  const [hasAppliedDeepLink, setHasAppliedDeepLink] = useState(false);
   useEffect(() => {
+    if (hasAppliedDeepLink) return;
     const urlOrg = searchParams.get('org');
     if (urlOrg && urlOrg !== orgId) {
       setOrgId(urlOrg);
     }
-  }, [searchParams, orgId, setOrgId]);
+    setHasAppliedDeepLink(true);
+  }, [searchParams, orgId, setOrgId, hasAppliedDeepLink]);
 
   const handleSwitchStudio = () => {
     setOrgId(null);
     setSelectedShow('');
-    navigate('/');
+    navigate('/', { replace: true });
   };
 
   // Theme Restoration
