@@ -10,25 +10,16 @@ export default function ProgramView({ showData, selectedShow, currentAct }) {
   const [selectedAct, setSelectedAct] = useState(null);
   const programRef = useRef(null);
 
-  // Program stats
   const stats = useMemo(() => {
     if (!showData?.acts) return null;
     const totalPerformers = new Set();
-    showData.acts.forEach(act => {
-      act.performers?.forEach(p => totalPerformers.add(p));
-    });
-    return {
-      acts: showData.acts.length,
-      performers: totalPerformers.size,
-    };
+    showData.acts.forEach(act => act.performers?.forEach(p => totalPerformers.add(p)));
+    return { acts: showData.acts.length, performers: totalPerformers.size };
   }, [showData]);
 
-  // Progress through the show
   const progress = useMemo(() => {
     if (!showData?.acts?.length || !currentAct?.isTracking) return null;
-    const total = showData.acts.length;
-    const current = currentAct.number || 0;
-    return Math.min(Math.round((current / total) * 100), 100);
+    return Math.min(Math.round((currentAct.number / showData.acts.length) * 100), 100);
   }, [showData, currentAct]);
 
   const handleShare = async () => {
@@ -37,31 +28,24 @@ export default function ProgramView({ showData, selectedShow, currentAct }) {
     if (orgId) params.set('org', orgId);
     if (selectedShow) params.set('show', selectedShow);
     const shareUrl = params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
-
     if (navigator.share) {
-      try {
-        await navigator.share({ title: `${showData?.label || 'Recital'} Program`, url: shareUrl });
-        return;
-      } catch { /* user cancelled */ }
+      try { await navigator.share({ title: `${showData?.label || 'Recital'} Program`, url: shareUrl }); return; }
+      catch { /* cancelled */ }
     }
     await navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   if (!showData) {
     return (
-      <div className="text-center py-20 bg-white dark:bg-slate-800 rounded-[2.5rem] border border-slate-100 dark:border-slate-700 shadow-sm space-y-4">
-        <div className="w-20 h-20 bg-pink-50 dark:bg-pink-900/20 rounded-full flex items-center justify-center mx-auto">
-          <Music size={36} className="text-pink-300 dark:text-pink-700" />
+      <div className="text-center py-12 sm:py-20 bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm space-y-3">
+        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-pink-50 dark:bg-pink-900/20 rounded-full flex items-center justify-center mx-auto">
+          <Music size={28} className="text-pink-300 dark:text-pink-700" />
         </div>
         <div>
-          <h3 className="text-lg font-black dark:text-white mb-1">No Performance Selected</h3>
-          <p className="text-slate-400 text-sm max-w-sm mx-auto">
+          <h3 className="text-base sm:text-lg font-black dark:text-white mb-1">No Performance Selected</h3>
+          <p className="text-slate-400 text-sm max-w-sm mx-auto px-4">
             Choose a performance from the dropdown above to view its program.
           </p>
         </div>
@@ -70,59 +54,55 @@ export default function ProgramView({ showData, selectedShow, currentAct }) {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in" ref={programRef}>
-      {/* Header with actions */}
-      <div className="flex justify-between items-end px-1">
-        <div>
-          <h2 className="text-3xl font-black dark:text-white leading-tight">{showData.label}</h2>
-          <p className="text-slate-400 text-xs font-black uppercase tracking-widest mt-1">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in" ref={programRef}>
+      {/* Header */}
+      <div className="flex justify-between items-end px-0.5">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-xl sm:text-3xl font-black dark:text-white leading-tight truncate">{showData.label}</h2>
+          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-0.5">
             Official Program
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
-            onClick={handlePrint}
-            className="hidden sm:flex items-center gap-2 px-4 py-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-slate-500 font-bold text-sm shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
-            title="Print program"
+            onClick={() => window.print()}
+            className="hidden sm:flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 text-sm shadow-sm hover:bg-slate-50 transition-all"
           >
-            <Printer size={18} />
+            <Printer size={16} />
           </button>
           <button
             onClick={handleShare}
-            className="flex items-center gap-2 px-5 py-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-pink-600 font-bold text-sm shadow-sm hover:bg-pink-50 transition-all"
+            className="flex items-center gap-1.5 px-3 sm:px-4 py-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-pink-600 font-bold text-sm shadow-sm hover:bg-pink-50 transition-all"
           >
-            {copied ? <><Check size={18} className="text-emerald-500" /> Copied</> : <><Share2 size={18} /> Share</>}
+            {copied ? <><Check size={16} className="text-emerald-500" /> <span className="hidden sm:inline">Copied</span></> : <><Share2 size={16} /> <span className="hidden sm:inline">Share</span></>}
           </button>
         </div>
       </div>
 
-      {/* Stats Bar */}
+      {/* Stats */}
       {stats && (
-        <div className="flex items-center gap-4 px-1">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
-            <Hash size={14} className="text-pink-500" />
-            {stats.acts} Acts
+        <div className="flex items-center gap-3 sm:gap-4 px-0.5 flex-wrap">
+          <div className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-slate-400">
+            <Hash size={12} className="text-pink-500" /> {stats.acts} Acts
           </div>
           <div className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
-            <Users size={14} className="text-pink-500" />
-            {stats.performers} Performers
+          <div className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-slate-400">
+            <Users size={12} className="text-pink-500" /> {stats.performers} Performers
           </div>
           {progress !== null && (
             <>
               <div className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
-                <BarChart3 size={14} className="text-pink-500" />
-                {progress}% Complete
+              <div className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-slate-400">
+                <BarChart3 size={12} className="text-pink-500" /> {progress}%
               </div>
             </>
           )}
         </div>
       )}
 
-      {/* Progress Bar (visible during live tracking) */}
+      {/* Progress Bar */}
       {progress !== null && (
-        <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+        <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-pink-500 to-rose-500 rounded-full transition-all duration-1000 ease-out"
             style={{ width: `${progress}%` }}
@@ -131,7 +111,7 @@ export default function ProgramView({ showData, selectedShow, currentAct }) {
       )}
 
       {/* Act List */}
-      <div className="space-y-4 print-program">
+      <div className="space-y-2.5 sm:space-y-4 print-program">
         {showData.acts?.map((act) => (
           <ActCard
             key={act.number}
@@ -144,7 +124,6 @@ export default function ProgramView({ showData, selectedShow, currentAct }) {
         ))}
       </div>
 
-      {/* Act Detail Modal */}
       <ActDetailModal
         act={selectedAct}
         isOpen={!!selectedAct}

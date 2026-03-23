@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useApp } from './context/AppContext';
 import { useLiveTracker } from './hooks/useLiveTracker';
@@ -59,15 +59,15 @@ export default function App() {
   } = useLiveTracker(orgId, selectedShow);
 
   // 4. Handle deep-linked Organization (only on initial load)
-  const [hasAppliedDeepLink, setHasAppliedDeepLink] = useState(false);
+  const deepLinkApplied = useRef(false);
   useEffect(() => {
-    if (hasAppliedDeepLink) return;
+    if (deepLinkApplied.current) return;
+    deepLinkApplied.current = true;
     const urlOrg = searchParams.get('org');
     if (urlOrg && urlOrg !== orgId) {
       setOrgId(urlOrg);
     }
-    setHasAppliedDeepLink(true);
-  }, [searchParams, orgId, setOrgId, hasAppliedDeepLink]);
+  }, [searchParams, orgId, setOrgId]);
 
   const handleSwitchStudio = () => {
     setOrgId(null);
@@ -182,39 +182,31 @@ export default function App() {
       </nav>
 
       {/* --- MAIN CONTENT AREA --- */}
-      <div className="flex-1 md:ml-72 min-h-screen pb-28 md:pb-12">
+      <div className="flex-1 md:ml-72 min-h-screen pb-20 md:pb-12">
         <StickyHeader currentAct={currentAct} isAuthorized={isAuthorized} onUpdate={updateActNumber} />
 
-        <div className="max-w-4xl mx-auto px-4 md:px-12 pt-8">
-          <header className="md:hidden flex flex-col gap-4 mb-8">
-            <div className="flex justify-between items-center">
-              <h1 className="text-3xl font-black text-pink-600 tracking-tight capitalize truncate pr-4">
-                {orgId ? orgId.replace(/-/g, ' ') : "Global Admin"}
-              </h1>
+        <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-12 pt-4 sm:pt-6 md:pt-8">
+          {/* Mobile header — compact single row */}
+          <header className="md:hidden flex items-center justify-between mb-4">
+            <h1 className="text-xl font-black text-pink-600 tracking-tight capitalize truncate pr-3">
+              {orgId ? orgId.replace(/-/g, ' ') : "Global Admin"}
+            </h1>
+            <div className="flex items-center gap-2 shrink-0">
+              {user && (
+                <div className="w-8 h-8 bg-pink-100 dark:bg-pink-900/30 text-pink-600 rounded-full flex items-center justify-center" title={user.email}>
+                  <User size={14} />
+                </div>
+              )}
               {orgId && (
                 <button
                   onClick={handleSwitchStudio}
-                  className="p-2 bg-slate-200 dark:bg-slate-800 rounded-full text-slate-500 hover:text-pink-600 transition-colors shrink-0"
+                  className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-400 hover:text-pink-600 transition-colors"
                   title="Switch Studio"
                 >
-                  <LogOut size={20} className="rotate-180" />
+                  <LogOut size={16} className="rotate-180" />
                 </button>
               )}
             </div>
-
-            {user && (
-              <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm animate-in fade-in">
-                 <div className="w-8 h-8 bg-pink-100 dark:bg-pink-900/30 text-pink-600 rounded-full flex items-center justify-center shrink-0">
-                   <User size={16} />
-                 </div>
-                 <div className="overflow-hidden flex-1">
-                   <p className="text-xs font-bold dark:text-white truncate">{user.email}</p>
-                 </div>
-                 <div className="flex items-center gap-1 text-[9px] font-black uppercase text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md shrink-0">
-                   Logged In
-                 </div>
-              </div>
-            )}
           </header>
 
           {!isHideSelector && (
@@ -225,27 +217,21 @@ export default function App() {
              />
           )}
 
-          <main className="animate-in fade-in slide-in-from-bottom-2 duration-700">
+          <main className="animate-in fade-in slide-in-from-bottom-2 duration-500">
             {selectedShow && !isHideSelector && (
               <LiveTrackerHero currentAct={currentAct} isAuthorized={isAuthorized} onUpdate={updateActNumber} onToggle={toggleTracking} />
             )}
 
-            {/* The React Router Core Engine */}
             <Routes>
               <Route path="/" element={<ProgramView {...commonProps} />} />
               <Route path="/search-acts" element={<SearchActView {...commonProps} />} />
               <Route path="/search-dancers" element={<SearchDancerView {...commonProps} />} />
               <Route path="/my-schedule" element={<MyScheduleView {...commonProps} />} />
-
-              {/* Protect the Admin Route */}
               <Route
                 path="/admin"
                 element={isAuthorized ? <AdminDashboard recitalData={recitalData} setRecitalData={setRecitalData} /> : <Navigate to="/" />}
               />
-
               <Route path="/settings" element={<SettingsView />} />
-
-              {/* Catch-all to send bad URLs back home */}
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </main>
@@ -256,13 +242,13 @@ export default function App() {
       <FloatingButtons currentAct={currentAct} />
 
       {/* --- MOBILE BOTTOM NAV --- */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex justify-around h-24 items-center px-2 z-40">
-        <NavButton to="/" active={location.pathname === '/'} icon={<List/>} label="Program" />
-        <NavButton to="/search-acts" active={location.pathname === '/search-acts'} icon={<Search/>} label="Acts" />
-        <NavButton to="/search-dancers" active={location.pathname === '/search-dancers'} icon={<Users/>} label="Dancers" />
-        <NavButton to="/my-schedule" active={location.pathname === '/my-schedule'} icon={<Heart/>} label="Schedule" badge={favCount} />
-        {isAuthorized && <NavButton to="/admin" active={location.pathname === '/admin'} icon={<ShieldAlert/>} label="Admin" />}
-        <NavButton to="/settings" active={location.pathname === '/settings'} icon={<Settings/>} label="Setup" />
+      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex justify-around items-center h-16 pb-safe px-1 z-40">
+        <NavButton to="/" active={location.pathname === '/'} icon={<List size={20}/>} label="Program" />
+        <NavButton to="/search-acts" active={location.pathname === '/search-acts'} icon={<Search size={20}/>} label="Acts" />
+        <NavButton to="/search-dancers" active={location.pathname === '/search-dancers'} icon={<Users size={20}/>} label="Dancers" />
+        <NavButton to="/my-schedule" active={location.pathname === '/my-schedule'} icon={<Heart size={20}/>} label="Schedule" badge={favCount} />
+        {isAuthorized && <NavButton to="/admin" active={location.pathname === '/admin'} icon={<ShieldAlert size={20}/>} label="Admin" />}
+        <NavButton to="/settings" active={location.pathname === '/settings'} icon={<Settings size={20}/>} label="Setup" />
       </nav>
     </div>
   );

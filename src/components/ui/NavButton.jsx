@@ -7,21 +7,24 @@ export default function NavButton({ active, to, icon, label, badge }) {
     <Link
       to={to}
       className={clsx(
-        "flex flex-col items-center justify-center w-16 h-16 rounded-2xl transition-all duration-300 relative",
+        "flex flex-col items-center justify-center gap-0.5 min-w-0 px-1 py-1.5 rounded-xl transition-colors relative",
         active
-          ? "text-pink-600 bg-pink-50 dark:bg-pink-900/20 -translate-y-2 shadow-lg shadow-pink-500/20"
-          : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+          ? "text-pink-600"
+          : "text-slate-400 active:text-slate-600"
       )}
     >
-      <div className={clsx("mb-1 transition-transform duration-300 relative", active && "scale-110")}>
+      <div className="relative">
         {icon}
         {badge > 0 && (
-          <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] bg-pink-600 text-white text-[9px] font-black rounded-full flex items-center justify-center px-1 shadow-sm">
+          <span className="absolute -top-1 -right-2 min-w-[16px] h-[16px] bg-pink-600 text-white text-[8px] font-black rounded-full flex items-center justify-center px-0.5 leading-none">
             {badge > 99 ? '99+' : badge}
           </span>
         )}
       </div>
-      <span className={clsx("text-[9px] font-black tracking-wider transition-all duration-300", active ? "opacity-100" : "opacity-0 h-0")}>
+      <span className={clsx(
+        "text-[9px] font-bold leading-none truncate max-w-full",
+        active ? "text-pink-600" : "text-slate-400"
+      )}>
         {label}
       </span>
     </Link>

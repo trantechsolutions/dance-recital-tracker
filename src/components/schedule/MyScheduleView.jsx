@@ -77,26 +77,26 @@ export default function MyScheduleView({ showData, currentAct }) {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in">
       {/* Header */}
-      <div className="px-1">
-        <h2 className="text-3xl font-black dark:text-white leading-tight">My Schedule</h2>
-        <p className="text-slate-400 text-xs font-black uppercase tracking-widest mt-1">
+      <div className="px-0.5">
+        <h2 className="text-xl sm:text-3xl font-black dark:text-white leading-tight">My Schedule</h2>
+        <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-0.5">
           {showData.label}
         </p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 text-center shadow-sm">
-          <div className="text-2xl font-black text-pink-600">{stats.favorited}</div>
-          <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mt-1">Acts</div>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-100 dark:border-slate-700 text-center shadow-sm">
+          <div className="text-xl sm:text-2xl font-black text-pink-600">{stats.favorited}</div>
+          <div className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-wider mt-0.5">Acts</div>
         </div>
-        <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 text-center shadow-sm">
-          <div className="text-2xl font-black text-pink-600">{stats.dancers}</div>
-          <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mt-1">Dancers</div>
+        <div className="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-100 dark:border-slate-700 text-center shadow-sm">
+          <div className="text-xl sm:text-2xl font-black text-pink-600">{stats.dancers}</div>
+          <div className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-wider mt-0.5">Dancers</div>
         </div>
-        <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 text-center shadow-sm">
+        <div className="bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-100 dark:border-slate-700 text-center shadow-sm">
           <div className="text-2xl font-black text-pink-600">
             {stats.total > 0 ? Math.round((stats.favorited / stats.total) * 100) : 0}%
           </div>

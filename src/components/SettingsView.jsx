@@ -68,11 +68,11 @@ export default function SettingsView() {
   };
 
   return (
-    <div className="space-y-6 pb-20 animate-in fade-in duration-500">
-      <h2 className="text-2xl font-black dark:text-white px-1">Settings</h2>
+    <div className="space-y-4 sm:space-y-6 pb-10 animate-in fade-in duration-500">
+      <h2 className="text-xl sm:text-2xl font-black dark:text-white px-0.5">Settings</h2>
 
       {/* Organization Section */}
-      <section className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+      <section className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
         <h3 className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest">Organization</h3>
         <button
           onClick={() => {
@@ -91,7 +91,7 @@ export default function SettingsView() {
       </section>
 
       {/* Account Section */}
-      <section className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+      <section className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Account & Sync</h3>
           {!user && (
@@ -177,7 +177,7 @@ export default function SettingsView() {
       </section>
 
       {/* Appearance Section */}
-      <section className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+      <section className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
         <h3 className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest">Appearance</h3>
         <div className="grid grid-cols-3 gap-3">
           <ThemeOption active={theme === 'light'} onClick={() => setTheme('light')} icon={<Sun size={20}/>} label="Light" />
