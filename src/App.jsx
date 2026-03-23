@@ -219,7 +219,7 @@ export default function App() {
 
           <main className="animate-in fade-in slide-in-from-bottom-2 duration-500">
             {selectedShow && !isHideSelector && (
-              <LiveTrackerHero currentAct={currentAct} isAuthorized={isAuthorized} onUpdate={updateActNumber} onToggle={toggleTracking} />
+              <LiveTrackerHero currentAct={currentAct} />
             )}
 
             <Routes>
@@ -229,7 +229,7 @@ export default function App() {
               <Route path="/my-schedule" element={<MyScheduleView {...commonProps} />} />
               <Route
                 path="/admin"
-                element={isAuthorized ? <AdminDashboard recitalData={recitalData} setRecitalData={setRecitalData} /> : <Navigate to="/" />}
+                element={isAuthorized ? <AdminDashboard recitalData={recitalData} setRecitalData={setRecitalData} currentAct={currentAct} updateActNumber={updateActNumber} toggleTracking={toggleTracking} selectedShow={selectedShow} setSelectedShow={setSelectedShow} /> : <Navigate to="/" />}
               />
               <Route path="/settings" element={<SettingsView />} />
               <Route path="*" element={<Navigate to="/" />} />

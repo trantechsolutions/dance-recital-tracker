@@ -3,7 +3,8 @@ import { useApp } from '../../context/AppContext';
 import {
   Save, Calendar, Plus, Trash2, Database, Upload,
   AlertCircle, X, Check, GripVertical, Building2, Shield,
-  User as UserIcon, RefreshCw, Sparkles, ChevronRight, Hash, Users, Pencil
+  User as UserIcon, RefreshCw, Sparkles, ChevronRight, Hash, Users, Pencil,
+  Radio, Minus, SkipForward, SkipBack, Square, Play
 } from 'lucide-react';
 import { db } from '../../firebase';
 import { seedDatabase, clearSeedData } from '../../utils/seedData';
@@ -22,7 +23,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-export default function AdminDashboard({ recitalData, setRecitalData }) {
+export default function AdminDashboard({ recitalData, setRecitalData, currentAct, updateActNumber, toggleTracking, setSelectedShow }) {
   const { isSuperAdmin, orgId, setOrgId } = useApp();
 
   const [selectedShowId, setSelectedShowId] = useState('');
@@ -618,7 +619,12 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
                 return (
                   <button
                     key={show.id}
-                    onClick={() => setSelectedShowId(isSelected ? '' : show.id)}
+                    onClick={() => {
+                      const newId = isSelected ? '' : show.id;
+                      setSelectedShowId(newId);
+                      // Sync with app-level selectedShow so useLiveTracker tracks this show
+                      if (setSelectedShow) setSelectedShow(newId);
+                    }}
                     className={clsx(
                       "text-left p-5 rounded-2xl border-2 transition-all group",
                       isSelected
@@ -668,6 +674,115 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
               >
                 <Plus size={16} /> Create First Show
               </button>
+            </div>
+          )}
+
+          {/* ── Live Tracker Control (shown when a show is selected) ── */}
+          {selectedShowId && editData && (
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-in fade-in">
+              {/* Tracker Header */}
+              <div className="p-4 sm:p-5 flex items-center justify-between border-b border-slate-100 dark:border-slate-700">
+                <div className="flex items-center gap-3">
+                  <div className={clsx(
+                    "p-2.5 rounded-xl",
+                    currentAct?.isTracking && currentAct?.number
+                      ? "bg-red-100 dark:bg-red-900/30 text-red-500"
+                      : "bg-slate-100 dark:bg-slate-900 text-slate-400"
+                  )}>
+                    <Radio size={18} className={currentAct?.isTracking ? "animate-pulse" : ""} />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-sm dark:text-white">Live Tracker</h3>
+                    <p className="text-[10px] font-bold text-slate-400">
+                      {currentAct?.isTracking ? 'Broadcasting live to all viewers' : 'Not tracking — viewers see the full program'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={toggleTracking}
+                  className={clsx(
+                    "flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all active:scale-95",
+                    currentAct?.isTracking
+                      ? "bg-red-500 text-white shadow-md shadow-red-500/20 hover:bg-red-600"
+                      : "bg-emerald-500 text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-600"
+                  )}
+                >
+                  {currentAct?.isTracking ? <><Square size={14} /> Stop</> : <><Play size={14} /> Go Live</>}
+                </button>
+              </div>
+
+              {/* Tracker Controls (visible when tracking is active) */}
+              {currentAct?.isTracking && (
+                <div className="p-4 sm:p-5">
+                  <div className="flex items-center gap-4">
+                    {/* Current act display */}
+                    <div className="flex-1 bg-gradient-to-r from-pink-600 to-rose-600 rounded-xl p-4 text-white text-center relative overflow-hidden">
+                      <div className="absolute inset-0 bg-white/5" />
+                      <div className="relative z-10">
+                        <div className="text-[9px] uppercase tracking-widest font-black opacity-70 mb-1">Now Performing</div>
+                        <div className="text-4xl font-black tracking-tighter">#{currentAct.number}</div>
+                        <div className="text-sm font-bold opacity-90 mt-0.5 truncate">{currentAct.title}</div>
+                      </div>
+                    </div>
+
+                    {/* Controls */}
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => updateActNumber(currentAct.number + 1)}
+                        className="flex items-center justify-center gap-1.5 w-full px-4 py-3 bg-pink-600 text-white rounded-xl font-bold text-xs shadow-md shadow-pink-500/20 hover:bg-pink-700 active:scale-95 transition-all"
+                      >
+                        <SkipForward size={16} /> Next
+                      </button>
+                      <button
+                        onClick={() => updateActNumber(Math.max(1, currentAct.number - 1))}
+                        disabled={currentAct.number <= 1}
+                        className="flex items-center justify-center gap-1.5 w-full px-4 py-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-xs hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all disabled:opacity-30"
+                      >
+                        <SkipBack size={16} /> Prev
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Quick jump — act list */}
+                  {editData.acts.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Jump to Act</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {editData.acts.map(act => (
+                          <button
+                            key={act.number}
+                            onClick={() => updateActNumber(act.number)}
+                            className={clsx(
+                              "w-9 h-9 rounded-lg font-bold text-xs transition-all active:scale-90",
+                              currentAct.number === act.number
+                                ? "bg-pink-600 text-white shadow-md shadow-pink-500/20"
+                                : "bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600"
+                            )}
+                            title={act.title}
+                          >
+                            {act.number}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Progress indicator */}
+                  {editData.acts.length > 0 && (
+                    <div className="mt-4 flex items-center gap-3">
+                      <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-900 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-pink-500 to-rose-500 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(Math.round((currentAct.number / editData.acts.length) * 100), 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-400 shrink-0">
+                        {currentAct.number} / {editData.acts.length}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
