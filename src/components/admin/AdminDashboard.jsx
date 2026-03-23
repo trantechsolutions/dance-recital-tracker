@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { db } from '../../firebase';
 import { seedDatabase, clearSeedData } from '../../utils/seedData';
-import { collection, doc, getDoc, getDocs, setDoc, query, where, orderBy, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where, orderBy, writeBatch } from 'firebase/firestore';
 import { clsx } from 'clsx';
 import Papa from 'papaparse';
 
@@ -340,6 +340,99 @@ export default function AdminDashboard({ recitalData, setRecitalData, currentAct
       setOrgData({ ...orgData, admins: newAdmins });
       showToast("Admins updated", "success");
     } catch (e) { showToast(e.message, "error"); }
+  };
+
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteLog, setDeleteLog] = useState([]);
+
+  const handleDeleteStudio = async (targetOrgId) => {
+    setIsDeleting(true);
+    setDeleteLog([]);
+    const log = (msg) => setDeleteLog(prev => [...prev, msg]);
+
+    try {
+      // 1. Find all shows for this org
+      log('Finding shows...');
+      const showsSnap = await getDocs(query(collection(db, 'shows'), where('org_id', '==', targetOrgId)));
+      const showIds = showsSnap.docs.map(d => d.id);
+      log(`Found ${showIds.length} show(s)`);
+
+      // 2. Delete all acts for each show
+      let totalActs = 0;
+      const allPerformers = new Set();
+      for (const showId of showIds) {
+        log(`Deleting acts for show: ${showId}...`);
+        const actsSnap = await getDocs(query(collection(db, 'acts'), where('show_id', '==', showId)));
+        if (actsSnap.size > 0) {
+          // Collect performer names for favorites cleanup
+          actsSnap.docs.forEach(d => {
+            const data = d.data();
+            (data.performers || []).forEach(p => allPerformers.add(p));
+          });
+          // Batch delete in chunks of 400
+          const docs = actsSnap.docs;
+          for (let i = 0; i < docs.length; i += 400) {
+            const batch = writeBatch(db);
+            docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+            await batch.commit();
+          }
+          totalActs += actsSnap.size;
+        }
+      }
+      log(`Deleted ${totalActs} acts`);
+
+      // 3. Delete all shows
+      log('Deleting shows...');
+      for (const showId of showIds) {
+        await deleteDoc(doc(db, 'shows', showId));
+      }
+
+      // 4. Delete all show_status
+      log('Deleting show statuses...');
+      for (const showId of showIds) {
+        await deleteDoc(doc(db, 'show_status', showId));
+      }
+
+      // 5. Delete the organization from both collections
+      log('Deleting organization...');
+      await deleteDoc(doc(db, 'organizations', targetOrgId));
+      await deleteDoc(doc(db, 'test_organizations', targetOrgId));
+
+      // 6. Scrub related favorites from all user profiles
+      log('Cleaning user favorites...');
+      const keysToRemove = new Set(allPerformers);
+      for (let n = 1; n <= 100; n++) keysToRemove.add(`act-${n}`);
+
+      let usersUpdated = 0;
+      const usersSnap = await getDocs(collection(db, 'user_profiles'));
+      for (const userDoc of usersSnap.docs) {
+        const favs = userDoc.data().favorites;
+        if (!Array.isArray(favs) || favs.length === 0) continue;
+        const cleaned = favs.filter(f => !keysToRemove.has(f));
+        if (cleaned.length !== favs.length) {
+          await setDoc(userDoc.ref, { favorites: cleaned }, { merge: true });
+          usersUpdated++;
+        }
+      }
+      log(`Cleaned favorites from ${usersUpdated} user(s)`);
+
+      log(`Done! Removed studio "${targetOrgId}" and all related data.`);
+      showToast(`Studio deleted with ${totalActs} acts across ${showIds.length} shows`, "success");
+
+      // 7. Reset local state
+      if (orgId === targetOrgId) {
+        setOrgId(null);
+        setOrgData({ name: '', admins: [] });
+        setSelectedShowId('');
+        if (setSelectedShow) setSelectedShow('');
+      }
+      setAllOrgs(prev => prev.filter(o => o.id !== targetOrgId));
+    } catch (err) {
+      log(`Error: ${err.message}`);
+      showToast("Delete failed: " + err.message, "error");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // ── Seed & Tools ─────────────────────────────────────────────────
@@ -1075,6 +1168,55 @@ export default function AdminDashboard({ recitalData, setRecitalData, currentAct
                     className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white px-5 rounded-xl font-bold text-sm hover:bg-slate-300 transition-colors"
                   >
                     Add
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Danger Zone: Delete Studio ── */}
+          {orgId && !isCreatingOrg && (
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border-2 border-red-200 dark:border-red-900/50">
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-xl shrink-0">
+                  <Trash2 size={20} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-black text-red-600 dark:text-red-400 mb-0.5">Danger Zone</h3>
+                  <p className="text-xs text-slate-400 mb-4">
+                    Permanently delete <strong className="text-slate-600 dark:text-slate-300">{orgData.name || orgId}</strong> and all its shows, acts, show statuses, and related user favorites. This action cannot be undone.
+                  </p>
+
+                  {deleteLog.length > 0 && (
+                    <div className="mb-4 bg-red-50 dark:bg-red-900/10 rounded-xl p-3 max-h-32 overflow-y-auto space-y-1">
+                      {deleteLog.map((msg, i) => (
+                        <div key={i} className="text-[11px] font-mono text-slate-400 flex items-center gap-2">
+                          <Check size={11} className="text-red-400 shrink-0" /> {msg}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      const name = orgData.name || orgId;
+                      const input = window.prompt(`Type "${name}" to confirm deletion:`);
+                      if (input === name) {
+                        handleDeleteStudio(orgId);
+                      } else if (input !== null) {
+                        showToast("Name didn't match. Deletion cancelled.", "error");
+                      }
+                    }}
+                    disabled={isDeleting}
+                    className={clsx(
+                      "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all active:scale-95",
+                      isDeleting
+                        ? "bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-wait"
+                        : "bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-500/20"
+                    )}
+                  >
+                    <Trash2 size={14} />
+                    {isDeleting ? 'Deleting...' : 'Delete Entire Studio'}
                   </button>
                 </div>
               </div>
