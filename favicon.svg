@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ec4899"/>
+      <stop offset="100%" style="stop-color:#db2777"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- Dancer silhouette - ballet arabesque -->
+  <g transform="translate(256,260) scale(1.1)" fill="white">
+    <!-- Head -->
+    <circle cx="0" cy="-130" r="28"/>
+    <!-- Hair bun -->
+    <circle cx="8" cy="-158" r="14"/>
+    <!-- Neck -->
+    <rect x="-6" y="-104" width="12" height="18" rx="4"/>
+    <!-- Torso - leaning forward slightly -->
+    <path d="M-22,-88 Q-28,-48 -18,0 L18,0 Q24,-48 18,-88 Z" rx="4"/>
+    <!-- Left arm - extended forward gracefully -->
+    <path d="M-18,-80 Q-60,-100 -100,-88 Q-110,-86 -118,-90"
+          stroke="white" stroke-width="14" fill="none" stroke-linecap="round"/>
+    <!-- Right arm - extended back and up -->
+    <path d="M18,-80 Q50,-110 80,-120 Q90,-122 98,-118"
+          stroke="white" stroke-width="14" fill="none" stroke-linecap="round"/>
+    <!-- Tutu/skirt -->
+    <ellipse cx="0" cy="2" rx="42" ry="14" fill="white" opacity="0.9"/>
+    <!-- Standing leg -->
+    <path d="M-6,10 Q-10,60 -8,110 Q-8,120 -6,130 L-4,148"
+          stroke="white" stroke-width="16" fill="none" stroke-linecap="round"/>
+    <!-- Pointed standing foot (en pointe) -->
+    <path d="M-5,146 Q-4,158 -2,164 Q0,168 2,164"
+          stroke="white" stroke-width="10" fill="none" stroke-linecap="round"/>
+    <!-- Extended back leg (arabesque) -->
+    <path d="M8,10 Q40,20 80,0 Q100,-10 120,-18"
+          stroke="white" stroke-width="16" fill="none" stroke-linecap="round"/>
+    <!-- Pointed back foot -->
+    <path d="M118,-17 Q130,-22 138,-28"
+          stroke="white" stroke-width="10" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>
