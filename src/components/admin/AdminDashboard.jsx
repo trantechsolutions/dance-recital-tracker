@@ -151,14 +151,14 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
   };
 
   const handleSeedData = async () => {
-    if (!window.confirm("This will create a 'Dancer\\'s Pointe' studio with 2 shows and 35 acts of demo data. Continue?")) return;
+    if (!window.confirm("This will create 2–4 random studios, each with 1–5 shows and 20–35 acts per show. Continue?")) return;
     setIsSeeding(true);
     setSeedLog([]);
     try {
       const result = await seedDatabase((msg) => {
         setSeedLog(prev => [...prev, msg]);
       });
-      showToast(`Seeded ${result.totalActs} acts across ${result.shows} shows!`, "success");
+      showToast(`Seeded ${result.studios} studios, ${result.shows} shows, ${result.totalActs} acts!`, "success");
       setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
       showToast("Seed failed: " + err.message, "error");
@@ -168,18 +168,15 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
   };
 
   const handleClearSeedData = async () => {
-    if (!window.confirm("This will delete the 'Dancer\\'s Pointe' studio, ALL its shows, acts, and remove related favorites from all users. Continue?")) return;
+    if (!window.confirm("This will delete ALL seeded studios, shows, acts, and remove related favorites from all users. Continue?")) return;
     setIsSeeding(true);
     setSeedLog([]);
     try {
       const result = await clearSeedData((msg) => {
         setSeedLog(prev => [...prev, msg]);
       });
-      showToast(`Cleared ${result.deleted} acts, ${result.shows} shows, and ${result.usersUpdated} user favorites!`, "success");
-      // Clear local org selection if it was the seeded org
-      if (orgId === 'dancers-pointe') {
-        setOrgId(null);
-      }
+      showToast(`Cleared ${result.studios} studios, ${result.deletedActs} acts, and cleaned ${result.usersUpdated} user(s)!`, "success");
+      setOrgId(null);
       setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
       showToast("Clear failed: " + err.message, "error");
@@ -405,7 +402,7 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
               <div className="flex-1">
                 <h4 className="font-black dark:text-white mb-1">Seed Demo Data</h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                  Populate Firestore with a &quot;Dancer&apos;s Pointe&quot; studio, 2 shows (Saturday &amp; Sunday), and 35 realistic acts with performers.
+                  Generate 2–4 random studios, each with 1–5 shows and 20–35 acts per show, with randomized dancer names and act titles. Each seed is unique.
                 </p>
                 {seedLog.length > 0 && (
                   <div className="mb-3 space-y-1">

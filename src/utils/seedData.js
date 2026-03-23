@@ -1,184 +1,342 @@
 import { db } from '../firebase';
-import { collection, doc, setDoc, deleteDoc, getDocs, query, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, getDoc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 
-const ORG_ID = 'dancers-pointe';
+// ── Name Pools ─────────────────────────────────────────────────────
 
-const organization = {
-  name: "Dancer's Pointe",
-  admins: ['jonny5v@gmail.com'],
-};
-
-const shows = [
-  {
-    id: '2026-spring-recital-saturday',
-    label: '2026 Spring Recital — Saturday 2:00 PM',
-    org_id: ORG_ID,
-  },
-  {
-    id: '2026-spring-recital-sunday',
-    label: '2026 Spring Recital — Sunday 4:00 PM',
-    org_id: ORG_ID,
-  },
+const FIRST_NAMES = [
+  'Emma', 'Sophia', 'Olivia', 'Ava', 'Isabella', 'Mia', 'Lily', 'Zoe',
+  'Chloe', 'Ella', 'Harper', 'Aria', 'Luna', 'Scarlett', 'Grace', 'Madison',
+  'Abigail', 'Riley', 'Layla', 'Penelope', 'Natalie', 'Victoria', 'Samantha',
+  'Hannah', 'Audrey', 'Claire', 'Maya', 'Ruby', 'Stella', 'Ivy', 'Priya',
+  'Anaya', 'Zara', 'Brooklyn', 'Jasmine', 'Savannah', 'Charlotte', 'Jayden',
+  'Ethan', 'Liam', 'Noah', 'Camila', 'Valentina', 'Nora', 'Hazel', 'Aurora',
+  'Ellie', 'Paisley', 'Willow', 'Emilia', 'Violet', 'Nova', 'Isla', 'Jade',
+  'Kinsley', 'Delilah', 'Sienna', 'Ariana', 'Aaliyah', 'Mackenzie', 'Kylie',
+  'Gianna', 'Maeve', 'Autumn', 'Piper', 'Taylor', 'Jordyn', 'Sydney', 'Reagan',
+  'Brianna', 'Kennedy', 'Leilani', 'Catalina', 'Alina', 'Athena', 'Myla',
+  'Vera', 'Amara', 'Daisy', 'Sage', 'Brielle', 'Raelynn', 'Kaia', 'Eliana',
+  'Iris', 'Fiona', 'Anastasia', 'Esmeralda', 'Serena', 'Juliana', 'Lola',
+  'Tessa', 'Margot', 'Elena', 'Freya', 'Wren', 'Thea', 'Rowan', 'June',
 ];
 
-const saturdayActs = [
-  { number: 1,  title: 'Opening: A New Day',           performers: ['Emma Rodriguez', 'Sophia Chen', 'Olivia Martinez', 'Ava Johnson', 'Isabella Brown', 'Mia Davis'] },
-  { number: 2,  title: 'Tiny Tutus',                   performers: ['Lily Thompson', 'Zoe Garcia', 'Chloe Wilson', 'Ella Moore'] },
-  { number: 3,  title: 'Rhythm Nation',                 performers: ['Harper Lee', 'Aria Taylor', 'Luna Anderson', 'Scarlett Thomas', 'Grace Jackson'] },
-  { number: 4,  title: 'Swan Lake (Excerpt)',           performers: ['Emma Rodriguez', 'Madison White', 'Abigail Harris'] },
-  { number: 5,  title: 'Hip Hop Remix',                 performers: ['Jayden Clark', 'Ethan Lewis', 'Liam Robinson', 'Noah Walker', 'Aria Taylor'] },
-  { number: 6,  title: 'Butterfly Garden',              performers: ['Chloe Wilson', 'Lily Thompson', 'Zoe Garcia', 'Penelope Hall'] },
-  { number: 7,  title: 'Contemporary Dreams',           performers: ['Sophia Chen', 'Madison White', 'Abigail Harris', 'Grace Jackson'] },
-  { number: 8,  title: 'Jazz Hands',                    performers: ['Scarlett Thomas', 'Harper Lee', 'Layla Allen', 'Riley Young'] },
-  { number: 9,  title: 'Frozen Fantasies',              performers: ['Ella Moore', 'Lily Thompson', 'Penelope Hall', 'Chloe Wilson', 'Zoe Garcia'] },
-  { number: 10, title: 'Tap Attack',                    performers: ['Luna Anderson', 'Aria Taylor', 'Riley Young', 'Layla Allen'] },
-  { number: 11, title: 'The Nutcracker Suite',          performers: ['Emma Rodriguez', 'Sophia Chen', 'Olivia Martinez', 'Madison White'] },
-  { number: 12, title: 'Acro Stars',                    performers: ['Ava Johnson', 'Isabella Brown', 'Mia Davis', 'Jayden Clark'] },
-  { number: 13, title: 'Lyrical: Chasing Light',        performers: ['Grace Jackson', 'Abigail Harris', 'Scarlett Thomas', 'Harper Lee'] },
-  { number: 14, title: 'Musical Theater Medley',        performers: ['Riley Young', 'Layla Allen', 'Luna Anderson', 'Ella Moore', 'Penelope Hall'] },
-  { number: 15, title: 'Pointe Perfection',             performers: ['Emma Rodriguez', 'Sophia Chen', 'Madison White'] },
-  { number: 16, title: 'K-Pop Energy',                  performers: ['Aria Taylor', 'Scarlett Thomas', 'Harper Lee', 'Jayden Clark', 'Ethan Lewis', 'Liam Robinson'] },
-  { number: 17, title: 'Under the Sea',                 performers: ['Lily Thompson', 'Zoe Garcia', 'Chloe Wilson', 'Ella Moore', 'Penelope Hall'] },
-  { number: 18, title: 'Ballroom Elegance',             performers: ['Olivia Martinez', 'Noah Walker', 'Ava Johnson', 'Ethan Lewis'] },
-  { number: 19, title: 'Finale: We Are the Light',      performers: ['Emma Rodriguez', 'Sophia Chen', 'Olivia Martinez', 'Ava Johnson', 'Isabella Brown', 'Mia Davis', 'Aria Taylor', 'Grace Jackson', 'Madison White', 'Abigail Harris', 'Scarlett Thomas', 'Harper Lee'] },
+const LAST_NAMES = [
+  'Rodriguez', 'Chen', 'Martinez', 'Johnson', 'Brown', 'Davis', 'Thompson',
+  'Garcia', 'Wilson', 'Moore', 'Lee', 'Taylor', 'Anderson', 'Thomas', 'Jackson',
+  'White', 'Harris', 'Clark', 'Lewis', 'Robinson', 'Walker', 'Hall', 'Allen',
+  'Young', 'Kim', 'Scott', 'Green', 'Adams', 'Baker', 'Nelson', 'Carter',
+  'Mitchell', 'Perez', 'Cooper', 'Patel', 'Shah', 'Campbell', 'Stewart',
+  'Morris', 'Rogers', 'Evans', 'Murphy', 'Rivera', 'Nguyen', 'Singh', 'Park',
+  'Sullivan', 'Bennett', 'Coleman', 'Foster', 'Brooks', 'Reed', 'Hayes',
+  'Ortiz', 'Ramirez', 'Flores', 'Cruz', 'Gomez', 'Diaz', 'Reyes', 'Morales',
+  'Chang', 'Wu', 'Liu', 'Yang', 'Tanaka', 'Sato', 'Yamamoto', 'Watanabe',
 ];
 
-const sundayActs = [
-  { number: 1,  title: 'Opening: Rise Up',             performers: ['Natalie Kim', 'Victoria Scott', 'Samantha Green', 'Hannah Adams', 'Audrey Baker'] },
-  { number: 2,  title: 'Little Stars',                  performers: ['Claire Nelson', 'Maya Carter', 'Ruby Mitchell', 'Stella Perez'] },
-  { number: 3,  title: 'Bollywood Beats',               performers: ['Priya Patel', 'Anaya Shah', 'Natalie Kim', 'Samantha Green', 'Hannah Adams'] },
-  { number: 4,  title: 'Classical Elegance',            performers: ['Victoria Scott', 'Audrey Baker', 'Charlotte Evans'] },
-  { number: 5,  title: 'Street Jazz',                   performers: ['Zara Campbell', 'Brooklyn Stewart', 'Jasmine Morris', 'Savannah Rogers'] },
-  { number: 6,  title: 'Enchanted Forest',              performers: ['Claire Nelson', 'Maya Carter', 'Ruby Mitchell', 'Stella Perez', 'Ivy Cooper'] },
-  { number: 7,  title: 'Modern: Gravity',               performers: ['Victoria Scott', 'Charlotte Evans', 'Audrey Baker'] },
-  { number: 8,  title: 'Salsa Caliente',                performers: ['Priya Patel', 'Anaya Shah', 'Zara Campbell', 'Brooklyn Stewart'] },
-  { number: 9,  title: "Cinderella's Waltz",            performers: ['Claire Nelson', 'Maya Carter', 'Stella Perez', 'Ivy Cooper'] },
-  { number: 10, title: 'Tap Spectacular',               performers: ['Jasmine Morris', 'Savannah Rogers', 'Hannah Adams', 'Samantha Green'] },
-  { number: 11, title: 'Pas de Deux',                   performers: ['Natalie Kim', 'Victoria Scott'] },
-  { number: 12, title: 'Tumbling Thunder',              performers: ['Brooklyn Stewart', 'Zara Campbell', 'Jasmine Morris'] },
-  { number: 13, title: 'Lyrical: Paper Wings',          performers: ['Audrey Baker', 'Charlotte Evans', 'Savannah Rogers', 'Hannah Adams'] },
-  { number: 14, title: 'Broadway Baby',                 performers: ['Ruby Mitchell', 'Stella Perez', 'Ivy Cooper', 'Claire Nelson', 'Maya Carter'] },
-  { number: 15, title: 'Pointe: Giselle Variation',     performers: ['Natalie Kim', 'Victoria Scott', 'Charlotte Evans'] },
-  { number: 16, title: 'Finale: Shine Together',        performers: ['Natalie Kim', 'Victoria Scott', 'Samantha Green', 'Hannah Adams', 'Audrey Baker', 'Charlotte Evans', 'Priya Patel', 'Anaya Shah', 'Zara Campbell', 'Brooklyn Stewart'] },
+const STUDIO_NAMES = [
+  "Dancer's Pointe", 'Starlight Dance Academy', 'Rhythm & Grace Studio',
+  'Elite Dance Company', 'Pirouette Dance Center', 'Allegro Dance Academy',
+  'Dance Fusion Studio', 'The Dance Collective', 'Arabesque Academy',
+  'Momentum Dance Studio', 'Silver Slipper Dance', 'En Pointe Academy',
+  'Harmony Dance Center', 'Leaps & Bounds Dance', 'The Moving Arts Studio',
 ];
+
+const ACT_TITLES = [
+  // Opening/Closing
+  'Opening: A New Day', 'Opening: Rise Up', 'Opening: Here We Go', 'Opening: Spotlight',
+  'Finale: We Are the Light', 'Finale: Shine Together', 'Finale: Take a Bow', 'Finale: Standing Ovation',
+  // Ballet
+  'Swan Lake (Excerpt)', 'The Nutcracker Suite', 'Sleeping Beauty Waltz', 'Giselle Variation',
+  'Pas de Deux', 'Pointe Perfection', 'Classical Elegance', 'Ballet Blanc',
+  'Coppélia Dreams', 'Don Quixote Variation', 'La Bayadère', 'Raymonda',
+  // Jazz
+  'Jazz Hands', 'All That Jazz', 'Street Jazz', 'Jazz Explosion', 'Cool Cat Jazz',
+  'Razzle Dazzle', 'Sassy Strut', 'Jazz Noir', 'Cabaret Nights',
+  // Hip Hop
+  'Hip Hop Remix', 'K-Pop Energy', 'Street Beats', 'Break It Down', 'Rhythm Nation',
+  'Urban Groove', 'Pop & Lock', 'Boombox Blast', 'Neon Lights',
+  // Contemporary/Lyrical
+  'Contemporary Dreams', 'Lyrical: Chasing Light', 'Lyrical: Paper Wings',
+  'Modern: Gravity', 'Freefall', 'Echoes', 'Unraveling', 'Breathe',
+  'Reflections', 'Silhouettes', 'Broken Beautiful', 'Ocean of Emotion',
+  // Tap
+  'Tap Attack', 'Tap Spectacular', 'Rhythm Makers', 'Happy Feet', 'Shuffle & Stomp',
+  'Syncopation Station', 'Tap That Beat', 'The Tap Pack',
+  // Theme/Character
+  'Frozen Fantasies', 'Under the Sea', 'Enchanted Forest', 'Butterfly Garden',
+  "Cinderella's Waltz", 'Wonderland', 'Stardust', 'Pixie Dust',
+  'Candyland', 'Toy Soldier March', 'Once Upon a Time', 'Fairy Tale Ball',
+  // Young/Kids
+  'Tiny Tutus', 'Little Stars', 'Baby Ballerinas', 'Twinkle Toes',
+  'Itty Bitty Ballet', 'Mini Movers', 'Petite Performers', 'Sparkle Squad',
+  // World/Cultural
+  'Bollywood Beats', 'Salsa Caliente', 'Ballroom Elegance', 'Flamenco Fire',
+  'Irish Jig', 'Samba Spirit', 'Tango Nights', 'African Rhythms',
+  // Acro/Tumble
+  'Acro Stars', 'Tumbling Thunder', 'Gravity Defiers', 'Flip Factory',
+  // Musical Theater
+  'Musical Theater Medley', 'Broadway Baby', 'West Side Story', 'Chicago Nights',
+  'A Chorus Line', 'Grease Lightning', 'Moulin Rouge', 'Hamilton Hustle',
+];
+
+const SHOW_LABELS = [
+  'Spring Recital', 'Winter Showcase', 'Summer Spectacular', 'Fall Festival',
+  'Holiday Performance', 'Year-End Gala', 'Annual Showcase', 'Dance Festival',
+  'Spring Showcase', 'Celebration of Dance',
+];
+
+const DAYS_TIMES = [
+  'Friday 6:00 PM', 'Friday 7:30 PM', 'Saturday 11:00 AM', 'Saturday 2:00 PM',
+  'Saturday 5:00 PM', 'Saturday 7:00 PM', 'Sunday 1:00 PM', 'Sunday 4:00 PM',
+  'Sunday 6:30 PM',
+];
+
+// ── Helpers ────────────────────────────────────────────────────────
+
+function rand(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function pickN(arr, n) {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, Math.min(n, shuffled.length));
+}
+
+function slugify(str) {
+  return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+function generateDancerPool(count) {
+  const names = new Set();
+  while (names.size < count) {
+    names.add(`${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`);
+  }
+  return [...names];
+}
+
+function generateActs(count, dancerPool) {
+  const usedTitles = new Set();
+  const acts = [];
+
+  for (let i = 1; i <= count; i++) {
+    let title;
+    // First act is always an opening, last is always a finale
+    if (i === 1) {
+      title = pick(ACT_TITLES.filter(t => t.startsWith('Opening')));
+    } else if (i === count) {
+      title = pick(ACT_TITLES.filter(t => t.startsWith('Finale')));
+    } else {
+      // Pick a unique title
+      const available = ACT_TITLES.filter(t => !usedTitles.has(t) && !t.startsWith('Opening') && !t.startsWith('Finale'));
+      title = available.length > 0 ? pick(available) : `Act ${i}`;
+    }
+    usedTitles.add(title);
+
+    const performerCount = rand(1, Math.min(12, dancerPool.length));
+    const performers = pickN(dancerPool, performerCount);
+
+    acts.push({ number: i, title, performers });
+  }
+
+  return acts;
+}
+
+function generateShows(orgId, count, dancerPool) {
+  const usedLabels = new Set();
+  const shows = [];
+
+  for (let i = 0; i < count; i++) {
+    let label;
+    const available = SHOW_LABELS.filter(l => !usedLabels.has(l));
+    label = available.length > 0 ? pick(available) : `Show ${i + 1}`;
+    usedLabels.add(label);
+
+    const dayTime = DAYS_TIMES[i % DAYS_TIMES.length];
+    const fullLabel = `2026 ${label} — ${dayTime}`;
+    const id = `${orgId}-${slugify(label)}-${i}`;
+
+    const actCount = rand(20, 35);
+    const acts = generateActs(actCount, dancerPool);
+
+    shows.push({ id, label: fullLabel, org_id: orgId, acts });
+  }
+
+  return shows;
+}
+
+function generateStudios() {
+  const studioCount = rand(2, 4);
+  const pickedNames = pickN(STUDIO_NAMES, studioCount);
+
+  return pickedNames.map(name => {
+    const orgId = slugify(name);
+    const showCount = rand(1, 5);
+    const dancerPoolSize = rand(20, 60);
+    const dancerPool = generateDancerPool(dancerPoolSize);
+    const shows = generateShows(orgId, showCount, dancerPool);
+
+    return {
+      orgId,
+      name,
+      admins: ['jonny5v@gmail.com'],
+      shows,
+      dancerPool,
+    };
+  });
+}
+
+// ── Seed ───────────────────────────────────────────────────────────
+
+const MANIFEST_REF = '_seed_manifest/latest';
 
 export async function seedDatabase(onProgress) {
   const log = (msg) => onProgress?.(msg);
 
-  log('Creating organization...');
-  await setDoc(doc(db, 'organizations', ORG_ID), organization);
-  await setDoc(doc(db, 'test_organizations', ORG_ID), organization);
+  const studios = generateStudios();
 
-  log('Creating shows...');
-  for (const show of shows) {
-    await setDoc(doc(db, 'shows', show.id), {
-      org_id: show.org_id,
-      label: show.label,
+  // Build manifest for later cleanup
+  const manifest = {
+    orgIds: [],
+    showIds: [],
+    allPerformers: new Set(),
+    seededAt: new Date().toISOString(),
+  };
+
+  for (const studio of studios) {
+    log(`Creating studio: ${studio.name}...`);
+    manifest.orgIds.push(studio.orgId);
+
+    await setDoc(doc(db, 'organizations', studio.orgId), {
+      name: studio.name,
+      admins: studio.admins,
     });
+    await setDoc(doc(db, 'test_organizations', studio.orgId), {
+      name: studio.name,
+      admins: studio.admins,
+    });
+
+    for (const show of studio.shows) {
+      log(`  Show: ${show.label} (${show.acts.length} acts)...`);
+      manifest.showIds.push(show.id);
+
+      await setDoc(doc(db, 'shows', show.id), {
+        org_id: show.org_id,
+        label: show.label,
+      });
+
+      // Batch write acts (Firestore batch limit = 500)
+      const acts = show.acts;
+      for (let i = 0; i < acts.length; i += 400) {
+        const chunk = acts.slice(i, i + 400);
+        const batch = writeBatch(db);
+        for (const act of chunk) {
+          const actRef = doc(collection(db, 'acts'));
+          batch.set(actRef, {
+            show_id: show.id,
+            number: act.number,
+            title: act.title,
+            performers: act.performers,
+          });
+          act.performers.forEach(p => manifest.allPerformers.add(p));
+        }
+        await batch.commit();
+      }
+
+      // Initialize show_status
+      await setDoc(doc(db, 'show_status', show.id), {
+        show_id: show.id,
+        org_id: show.org_id,
+        current_act_number: 1,
+        is_tracking: false,
+        updated_at: new Date().toISOString(),
+      });
+    }
   }
 
-  log('Creating Saturday acts...');
-  const batch1 = writeBatch(db);
-  for (const act of saturdayActs) {
-    const actRef = doc(collection(db, 'acts'));
-    batch1.set(actRef, {
-      show_id: shows[0].id,
-      number: act.number,
-      title: act.title,
-      performers: act.performers,
-    });
-  }
-  await batch1.commit();
+  // Save manifest so clear knows what to delete
+  log('Saving seed manifest...');
+  await setDoc(doc(db, MANIFEST_REF), {
+    orgIds: manifest.orgIds,
+    showIds: manifest.showIds,
+    allPerformers: [...manifest.allPerformers],
+    seededAt: manifest.seededAt,
+  });
 
-  log('Creating Sunday acts...');
-  const batch2 = writeBatch(db);
-  for (const act of sundayActs) {
-    const actRef = doc(collection(db, 'acts'));
-    batch2.set(actRef, {
-      show_id: shows[1].id,
-      number: act.number,
-      title: act.title,
-      performers: act.performers,
-    });
-  }
-  await batch2.commit();
+  const totalShows = studios.reduce((s, st) => s + st.shows.length, 0);
+  const totalActs = studios.reduce((s, st) => s + st.shows.reduce((a, sh) => a + sh.acts.length, 0), 0);
 
-  log('Initializing show status...');
-  for (const show of shows) {
-    await setDoc(doc(db, 'show_status', show.id), {
-      show_id: show.id,
-      org_id: ORG_ID,
-      current_act_number: 1,
-      is_tracking: false,
-      updated_at: new Date().toISOString(),
-    });
-  }
-
-  const totalActs = saturdayActs.length + sundayActs.length;
-  log(`Done! Created ${totalActs} acts across ${shows.length} shows.`);
+  log(`Done! ${studios.length} studios, ${totalShows} shows, ${totalActs} acts.`);
 
   return {
-    orgId: ORG_ID,
-    shows: shows.length,
-    saturdayActs: saturdayActs.length,
-    sundayActs: sundayActs.length,
+    studios: studios.length,
+    shows: totalShows,
     totalActs,
+    performers: manifest.allPerformers.size,
   };
 }
 
-// Build a Set of all favoritable strings from the seeded data
-// so we can scrub them from user profiles on clear.
-function getSeededFavoriteKeys() {
-  const keys = new Set();
-  const allActs = [...saturdayActs, ...sundayActs];
-
-  for (const act of allActs) {
-    keys.add(`act-${act.number}`);
-    for (const p of act.performers) {
-      keys.add(p);
-    }
-  }
-  return keys;
-}
+// ── Clear ──────────────────────────────────────────────────────────
 
 export async function clearSeedData(onProgress) {
   const log = (msg) => onProgress?.(msg);
-  let deleted = 0;
 
-  // 1. Delete acts for seeded shows
-  for (const show of shows) {
-    log(`Deleting acts for: ${show.label}...`);
-    const actsSnap = await getDocs(query(collection(db, 'acts'), where('show_id', '==', show.id)));
+  // 1. Read the manifest
+  log('Reading seed manifest...');
+  const manifestSnap = await getDoc(doc(db, MANIFEST_REF));
+
+  if (!manifestSnap.exists()) {
+    throw new Error('No seed manifest found. Nothing to clear.');
+  }
+
+  const { orgIds, showIds, allPerformers } = manifestSnap.data();
+  let deletedActs = 0;
+
+  // 2. Delete acts for each seeded show
+  for (const showId of showIds) {
+    log(`Deleting acts for show: ${showId}...`);
+    const actsSnap = await getDocs(query(collection(db, 'acts'), where('show_id', '==', showId)));
     if (actsSnap.size > 0) {
-      const batch = writeBatch(db);
-      actsSnap.docs.forEach(d => batch.delete(d.ref));
-      await batch.commit();
-      deleted += actsSnap.size;
+      // Batch in chunks of 400
+      const docs = actsSnap.docs;
+      for (let i = 0; i < docs.length; i += 400) {
+        const batch = writeBatch(db);
+        docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+      deletedActs += actsSnap.size;
     }
   }
 
-  // 2. Delete shows
-  log('Deleting shows...');
-  for (const show of shows) {
-    await deleteDoc(doc(db, 'shows', show.id));
+  // 3. Delete shows
+  log(`Deleting ${showIds.length} shows...`);
+  for (const showId of showIds) {
+    await deleteDoc(doc(db, 'shows', showId));
   }
 
-  // 3. Delete show_status
-  log('Deleting show status...');
-  for (const show of shows) {
-    await deleteDoc(doc(db, 'show_status', show.id));
+  // 4. Delete show_status
+  log('Deleting show statuses...');
+  for (const showId of showIds) {
+    await deleteDoc(doc(db, 'show_status', showId));
   }
 
-  // 4. Delete organization from both collections
-  log('Deleting organization...');
-  await deleteDoc(doc(db, 'organizations', ORG_ID));
-  await deleteDoc(doc(db, 'test_organizations', ORG_ID));
+  // 5. Delete organizations
+  log(`Deleting ${orgIds.length} organizations...`);
+  for (const orgId of orgIds) {
+    await deleteDoc(doc(db, 'organizations', orgId));
+    await deleteDoc(doc(db, 'test_organizations', orgId));
+  }
 
-  // 5. Scrub seeded favorites from ALL user profiles
+  // 6. Scrub favorites from all user profiles
   log('Cleaning favorites from user profiles...');
-  const seededKeys = getSeededFavoriteKeys();
-  let usersUpdated = 0;
+  const seededKeys = new Set(allPerformers || []);
+  // Also add act-N patterns (acts go up to 35 max)
+  for (let n = 1; n <= 50; n++) {
+    seededKeys.add(`act-${n}`);
+  }
 
+  let usersUpdated = 0;
   const usersSnap = await getDocs(collection(db, 'user_profiles'));
   for (const userDoc of usersSnap.docs) {
     const data = userDoc.data();
@@ -186,15 +344,22 @@ export async function clearSeedData(onProgress) {
     if (!Array.isArray(favs) || favs.length === 0) continue;
 
     const cleaned = favs.filter(f => !seededKeys.has(f));
-
-    // Only write back if something was actually removed
     if (cleaned.length !== favs.length) {
       await setDoc(userDoc.ref, { favorites: cleaned }, { merge: true });
       usersUpdated++;
     }
   }
 
-  log(`Done! Removed ${deleted} acts, ${shows.length} shows, and cleaned ${usersUpdated} user profile(s).`);
+  // 7. Delete the manifest itself
+  log('Removing seed manifest...');
+  await deleteDoc(doc(db, MANIFEST_REF));
 
-  return { deleted, shows: shows.length, orgId: ORG_ID, usersUpdated };
+  log(`Done! Removed ${deletedActs} acts, ${showIds.length} shows, ${orgIds.length} studios, cleaned ${usersUpdated} user(s).`);
+
+  return {
+    deletedActs,
+    shows: showIds.length,
+    studios: orgIds.length,
+    usersUpdated,
+  };
 }
