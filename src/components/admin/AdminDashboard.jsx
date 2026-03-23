@@ -162,7 +162,7 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
     }
   };
 
-  // ── Batch Upload ─────────────────────────────────────────────────
+  // ── Single-Show CSV Upload (inline in act editor) ─────────────
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -203,6 +203,117 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
         } catch (err) {
           showToast(err.message, "error");
         }
+      }
+    });
+  };
+
+  // ── Bulk Import (multiple shows + acts from one CSV) ───────────
+
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [bulkLog, setBulkLog] = useState([]);
+
+  const handleBulkImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!orgId) return showToast("Select a studio first", "error");
+
+    setBulkImporting(true);
+    setBulkLog([]);
+    const log = (msg) => setBulkLog(prev => [...prev, msg]);
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          const rows = results.data;
+          if (rows.length === 0) throw new Error("CSV is empty");
+
+          // Group rows by show name
+          const showMap = {};
+          for (const row of rows) {
+            const showName = (row.show || '').trim();
+            if (!showName) continue;
+            if (!showMap[showName]) showMap[showName] = [];
+            showMap[showName].push({
+              number: parseInt(row.number) || (showMap[showName].length + 1),
+              title: (row.title || '').trim() || 'Untitled Act',
+              performers: row.performers ? row.performers.split(';').map(p => p.trim()).filter(Boolean) : [],
+            });
+          }
+
+          const showNames = Object.keys(showMap);
+          if (showNames.length === 0) throw new Error('No valid rows found. Make sure your CSV has a "show" column.');
+
+          log(`Found ${showNames.length} show(s) with ${rows.length} total rows`);
+
+          let totalActs = 0;
+          const newRecitalData = { ...recitalData };
+
+          for (const showName of showNames) {
+            // Create a unique show ID from the name
+            const showId = `${orgId}-${showName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Date.now()}`;
+            const acts = showMap[showName];
+
+            log(`Creating "${showName}" (${acts.length} acts)...`);
+
+            // Save the show document
+            await setDoc(doc(db, 'shows', showId), {
+              org_id: orgId,
+              label: showName,
+            });
+
+            // Batch write acts (chunks of 400 for Firestore limit)
+            for (let i = 0; i < acts.length; i += 400) {
+              const chunk = acts.slice(i, i + 400);
+              const batch = writeBatch(db);
+              for (const act of chunk) {
+                const actRef = doc(collection(db, 'acts'));
+                batch.set(actRef, {
+                  show_id: showId,
+                  number: act.number,
+                  title: act.title,
+                  performers: act.performers,
+                });
+              }
+              await batch.commit();
+            }
+
+            // Initialize show status
+            await setDoc(doc(db, 'show_status', showId), {
+              show_id: showId,
+              org_id: orgId,
+              current_act_number: 1,
+              is_tracking: false,
+              updated_at: new Date().toISOString(),
+            });
+
+            // Update local state
+            newRecitalData[showId] = {
+              id: showId,
+              label: showName,
+              acts: acts.map(a => ({ number: a.number, title: a.title, performers: a.performers })),
+            };
+
+            totalActs += acts.length;
+          }
+
+          setRecitalData(newRecitalData);
+          log(`Done! Created ${showNames.length} shows with ${totalActs} acts.`);
+          showToast(`Imported ${showNames.length} shows, ${totalActs} acts!`, "success");
+        } catch (err) {
+          log(`Error: ${err.message}`);
+          showToast("Import failed: " + err.message, "error");
+        } finally {
+          setBulkImporting(false);
+          // Reset file input so re-uploading same file triggers onChange
+          e.target.value = '';
+        }
+      },
+      error: (err) => {
+        showToast("Failed to parse CSV: " + err.message, "error");
+        setBulkImporting(false);
       }
     });
   };
@@ -343,18 +454,116 @@ export default function AdminDashboard({ recitalData, setRecitalData }) {
                 {showList.length} performance{showList.length !== 1 ? 's' : ''} for {orgData.name || orgId || 'this studio'}
               </p>
             </div>
-            <button
-              onClick={() => { setIsAddingShow(!isAddingShow); setSelectedShowId(''); }}
-              className={clsx(
-                "flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm transition-all active:scale-95",
-                isAddingShow
-                  ? "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-                  : "bg-pink-600 text-white shadow-lg shadow-pink-500/20"
-              )}
-            >
-              {isAddingShow ? <><X size={18} /> Cancel</> : <><Plus size={18} /> New Show</>}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowBulkImport(!showBulkImport); setIsAddingShow(false); }}
+                className={clsx(
+                  "flex items-center gap-2 px-4 py-3 rounded-2xl font-bold text-sm transition-all active:scale-95",
+                  showBulkImport
+                    ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
+                    : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
+                )}
+              >
+                <Upload size={16} /> <span className="hidden sm:inline">Bulk Import</span>
+              </button>
+              <button
+                onClick={() => { setIsAddingShow(!isAddingShow); setSelectedShowId(''); setShowBulkImport(false); }}
+                className={clsx(
+                  "flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm transition-all active:scale-95",
+                  isAddingShow
+                    ? "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                    : "bg-pink-600 text-white shadow-lg shadow-pink-500/20"
+                )}
+              >
+                {isAddingShow ? <><X size={18} /> Cancel</> : <><Plus size={18} /> New Show</>}
+              </button>
+            </div>
           </div>
+
+          {/* ── Bulk Import Panel ── */}
+          {showBulkImport && (
+            <div className="bg-white dark:bg-slate-800 p-5 sm:p-6 rounded-2xl border-2 border-amber-400 dark:border-amber-600 shadow-xl animate-in fade-in duration-200">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="p-2.5 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded-xl shrink-0">
+                  <Upload size={20} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-black dark:text-white">Bulk Import Shows & Acts</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Upload a single CSV to create multiple shows with all their acts at once.
+                  </p>
+                </div>
+                <button onClick={() => setShowBulkImport(false)} className="text-slate-400 hover:text-slate-600 p-1">
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* CSV Format Guide */}
+              <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl mb-4">
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Required CSV Format</p>
+                <div className="overflow-x-auto">
+                  <table className="text-xs w-full">
+                    <thead>
+                      <tr className="text-left text-slate-400 font-black uppercase">
+                        <th className="pr-4 py-1">show</th>
+                        <th className="pr-4 py-1">number</th>
+                        <th className="pr-4 py-1">title</th>
+                        <th className="py-1">performers</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-slate-600 dark:text-slate-300 font-mono text-[11px]">
+                      <tr>
+                        <td className="pr-4 py-0.5">Saturday 2pm</td>
+                        <td className="pr-4 py-0.5">1</td>
+                        <td className="pr-4 py-0.5">Opening Number</td>
+                        <td className="py-0.5">Emma R; Sophia C; Olivia M</td>
+                      </tr>
+                      <tr className="text-slate-400 dark:text-slate-500">
+                        <td className="pr-4 py-0.5">Saturday 2pm</td>
+                        <td className="pr-4 py-0.5">2</td>
+                        <td className="pr-4 py-0.5">Jazz Hands</td>
+                        <td className="py-0.5">Lily T; Zoe G</td>
+                      </tr>
+                      <tr className="text-slate-400 dark:text-slate-500">
+                        <td className="pr-4 py-0.5">Sunday 4pm</td>
+                        <td className="pr-4 py-0.5">1</td>
+                        <td className="pr-4 py-0.5">Rise Up</td>
+                        <td className="py-0.5">Natalie K; Victoria S</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2">
+                  The <strong>show</strong> column groups acts into separate performances. Performers are separated by semicolons.
+                </p>
+              </div>
+
+              {/* Progress log */}
+              {bulkLog.length > 0 && (
+                <div className="mb-4 bg-slate-50 dark:bg-slate-900 rounded-xl p-3 max-h-32 overflow-y-auto space-y-1">
+                  {bulkLog.map((msg, i) => (
+                    <div key={i} className="text-[11px] font-mono text-slate-400 flex items-center gap-2">
+                      <Check size={11} className="text-emerald-500 shrink-0" /> {msg}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Upload input */}
+              <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-6 text-center hover:border-amber-400 transition-colors">
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleBulkImport}
+                  disabled={bulkImporting}
+                  className="mx-auto block text-sm text-slate-500 file:mr-3 file:py-2.5 file:px-6 file:rounded-xl file:border-0 file:bg-amber-500 file:text-white file:font-bold file:text-sm file:cursor-pointer disabled:opacity-50"
+                />
+                {bulkImporting && (
+                  <p className="mt-3 text-xs font-bold text-amber-600 animate-pulse">Importing...</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ── New Show Form ── */}
           {isAddingShow && (
