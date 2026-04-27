@@ -24,6 +24,7 @@ import StudioSelector from './components/StudioSelector';
 import LoginScreen from './components/LoginScreen';
 import ShowSelector from './components/ui/ShowSelector';
 import FloatingButtons from './components/ui/FloatingButtons';
+import LoginPromptModal from './components/ui/LoginPromptModal';
 
 // Helper component
 function LoadingScreen({ text }) {
@@ -46,7 +47,8 @@ export default function App() {
   const {
     user, isAuthorized, isSuperAdmin, isAuthChecking,
     hasSkippedLogin, skipLogin, favorites, toggleFavorite,
-    orgId, setOrgId
+    orgId, setOrgId, orgName,
+    loginPromptOpen, setLoginPromptOpen,
   } = useApp();
 
   // 2. Initialize show locally from URL (for deep links)
@@ -54,7 +56,7 @@ export default function App() {
 
   // 3. Track Live Data
   const {
-    recitalData, currentAct, loading,
+    recitalData, currentAct, loading, liveShowId,
     setRecitalData, updateActNumber, toggleTracking
   } = useLiveTracker(orgId, selectedShow);
 
@@ -68,6 +70,18 @@ export default function App() {
       setOrgId(urlOrg);
     }
   }, [searchParams, orgId, setOrgId]);
+
+  // 5. Auto-select show: prefer live show, then only show if exactly one exists
+  useEffect(() => {
+    if (!recitalData || selectedShow) return;
+    const showIds = Object.keys(recitalData);
+    if (showIds.length === 0) return;
+    const toSelect = (liveShowId && recitalData[liveShowId])
+      ? liveShowId
+      : showIds.length === 1 ? showIds[0] : null;
+    // setTimeout defers the state update to avoid cascading renders within effect
+    if (toSelect) { const t = setTimeout(() => setSelectedShow(toSelect), 0); return () => clearTimeout(t); }
+  }, [recitalData, liveShowId, selectedShow]);
 
   const handleSwitchStudio = () => {
     setOrgId(null);
@@ -94,6 +108,9 @@ export default function App() {
 
   // Favorites count
   const favCount = favorites?.size || 0;
+
+  // Display name: real org name from Firestore, fallback to slug
+  const displayName = orgName || (orgId ? orgId.replace(/-/g, ' ') : 'Global Admin');
 
   // --- UI WATERFALL ---
 
@@ -140,7 +157,7 @@ export default function App() {
       <nav className="hidden md:flex md:w-72 md:flex-col md:fixed md:h-full bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 p-8 z-50">
         <div className="mb-8">
           <h1 className="text-3xl font-black text-pink-600 tracking-tighter leading-none capitalize">
-            {orgId ? orgId.replace(/-/g, ' ') : "Global Admin"}
+            {displayName}
           </h1>
           <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mt-3">Recital Portal</p>
         </div>
@@ -189,7 +206,7 @@ export default function App() {
           {/* Mobile header — compact single row */}
           <header className="md:hidden flex items-center justify-between mb-4">
             <h1 className="text-xl font-black text-pink-600 tracking-tight capitalize truncate pr-3">
-              {orgId ? orgId.replace(/-/g, ' ') : "Global Admin"}
+              {displayName}
             </h1>
             <div className="flex items-center gap-2 shrink-0">
               {user && (
@@ -244,12 +261,19 @@ export default function App() {
       {/* --- MOBILE BOTTOM NAV --- */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex justify-around items-center h-16 pb-safe px-1 z-40">
         <NavButton to="/" active={location.pathname === '/'} icon={<List size={20}/>} label="Program" />
-        <NavButton to="/search-acts" active={location.pathname === '/search-acts'} icon={<Search size={20}/>} label="Acts" />
+        <NavButton to="/search-acts" active={location.pathname === '/search-acts'} icon={<Search size={20}/>} label="Search" />
         <NavButton to="/search-dancers" active={location.pathname === '/search-dancers'} icon={<Users size={20}/>} label="Dancers" />
         <NavButton to="/my-schedule" active={location.pathname === '/my-schedule'} icon={<Heart size={20}/>} label="Schedule" badge={favCount} />
         {isAuthorized && <NavButton to="/admin" active={location.pathname === '/admin'} icon={<ShieldAlert size={20}/>} label="Admin" />}
-        <NavButton to="/settings" active={location.pathname === '/settings'} icon={<Settings size={20}/>} label="Setup" />
+        <NavButton to="/settings" active={location.pathname === '/settings'} icon={<Settings size={20}/>} label="Settings" />
       </nav>
+
+      {/* --- LOGIN PROMPT MODAL --- */}
+      <LoginPromptModal
+        isOpen={loginPromptOpen}
+        onClose={() => setLoginPromptOpen(false)}
+        onGoToSettings={() => { setLoginPromptOpen(false); navigate('/settings'); }}
+      />
     </div>
   );
 }

@@ -10,10 +10,13 @@ export function AppProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isStudioAdmin, setIsStudioAdmin] = useState(false);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [hasSkippedLogin, setHasSkippedLogin] = useState(() => localStorage.getItem('hasSkippedLogin') === 'true');
   const [favorites, setFavorites] = useState(new Set());
   const [orgId, setOrgId] = useState(() => localStorage.getItem('selectedOrgId') || null);
+  const [orgName, setOrgName] = useState('');
+  const [loginPromptOpen, setLoginPromptOpen] = useState(false);
 
   // --- Auth & Favorites Sync ---
   useEffect(() => {
@@ -83,13 +86,34 @@ export function AppProvider({ children }) {
       localStorage.setItem('selectedOrgId', orgId);
     } else {
       localStorage.removeItem('selectedOrgId');
+      setOrgName('');
+      setIsStudioAdmin(false);
     }
   }, [orgId]);
+
+  // --- Org Name + Studio Admin Check ---
+  useEffect(() => {
+    if (!orgId) return;
+    const fetchOrg = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'organizations', orgId));
+        if (!snap.exists()) return;
+        const data = snap.data();
+        setOrgName(data.name || '');
+        const studioAdmin = !!(user && data.admins?.includes(user.email));
+        setIsStudioAdmin(studioAdmin);
+        setIsAuthorized(prev => prev || studioAdmin);
+      } catch (err) {
+        console.error('[Org] Failed to fetch org:', err);
+      }
+    };
+    fetchOrg();
+  }, [orgId, user]);
 
   // --- Actions ---
   const toggleFavorite = async (name) => {
     if (!user) {
-      alert("Please create an account or sign in from the Setup tab to save favorites!");
+      setLoginPromptOpen(true);
       return false;
     }
 
@@ -119,10 +143,11 @@ export function AppProvider({ children }) {
   };
 
   const value = {
-    user, isAuthorized, isSuperAdmin, isAuthChecking,
+    user, isAuthorized, isSuperAdmin, isStudioAdmin, isAuthChecking,
     hasSkippedLogin, skipLogin, clearSkipLogin,
     favorites, toggleFavorite,
-    orgId, setOrgId
+    orgId, setOrgId, orgName,
+    loginPromptOpen, setLoginPromptOpen,
   };
 
   return (

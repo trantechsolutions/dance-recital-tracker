@@ -4,13 +4,15 @@ import {
   Save, Calendar, Plus, Trash2, Database, Upload,
   AlertCircle, X, Check, GripVertical, Building2, Shield,
   User as UserIcon, RefreshCw, Sparkles, ChevronRight, Hash, Users, Pencil,
-  Radio, Minus, SkipForward, SkipBack, Square, Play
+  Radio, Minus, SkipForward, SkipBack, Square, Play, Tv2, Download
 } from 'lucide-react';
 import { db } from '../../firebase';
 import { seedDatabase, clearSeedData } from '../../utils/seedData';
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where, orderBy, writeBatch } from 'firebase/firestore';
 import { clsx } from 'clsx';
 import Papa from 'papaparse';
+import PerformerEditor from './PerformerEditor';
+import LiveShowController from './LiveShowController';
 
 // DND Kit Imports
 import {
@@ -22,6 +24,31 @@ import {
   verticalListSortingStrategy, useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+// Parse ISO timestamp show IDs into a readable date string
+function formatShowDate(id) {
+  try {
+    const d = new Date(id);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  } catch { return null; }
+}
+
+// Generate and download the CSV template
+function downloadCsvTemplate() {
+  const template = [
+    'show,number,title,performers',
+    'Saturday 2pm,1,Opening Number,Emma R; Sophia C; Olivia M',
+    'Saturday 2pm,2,Jazz Hands,Lily T; Zoe G',
+    'Sunday 4pm,1,Rise Up,Natalie K; Victoria S',
+  ].join('\n');
+  const url = URL.createObjectURL(new Blob([template], { type: 'text/csv' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'recital-template.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function AdminDashboard({ recitalData, setRecitalData, currentAct, updateActNumber, toggleTracking, setSelectedShow }) {
   const { isSuperAdmin, orgId, setOrgId } = useApp();
@@ -52,6 +79,7 @@ export default function AdminDashboard({ recitalData, setRecitalData, currentAct
   const [seedLog, setSeedLog] = useState([]);
 
   const [activeAdminTab, setActiveAdminTab] = useState(orgId ? 'shows' : 'studio');
+  const [showNightMode, setShowNightMode] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -148,8 +176,11 @@ export default function AdminDashboard({ recitalData, setRecitalData, currentAct
 
   const updateAct = (index, field, value) => {
     const updatedActs = [...editData.acts];
-    if (field === 'performers') updatedActs[index][field] = value.split(/[,\n]/);
-    else updatedActs[index][field] = value;
+    if (field === 'performers' && typeof value === 'string') {
+      updatedActs[index][field] = value.split(/[,\n]/).map(p => p.trim()).filter(Boolean);
+    } else {
+      updatedActs[index][field] = value;
+    }
     setEditData({ ...editData, acts: updatedActs });
   };
 
@@ -497,6 +528,17 @@ export default function AdminDashboard({ recitalData, setRecitalData, currentAct
   return (
     <div className="space-y-6 animate-in fade-in duration-500 relative pb-20">
 
+      {/* Show Night Mode overlay */}
+      {showNightMode && editData && (
+        <LiveShowController
+          showData={editData}
+          currentAct={currentAct}
+          updateActNumber={updateActNumber}
+          toggleTracking={toggleTracking}
+          onClose={() => setShowNightMode(false)}
+        />
+      )}
+
       {/* Toast */}
       {toast && (
         <div className={clsx(
@@ -509,30 +551,28 @@ export default function AdminDashboard({ recitalData, setRecitalData, currentAct
       )}
 
       {/* ── TAB NAVIGATION ────────────────────────────────────── */}
-      {isSuperAdmin && (
-        <div className="flex gap-1.5 p-1.5 bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-x-auto">
-          {[
-            { key: 'shows', icon: <Calendar size={16} />, label: 'Shows & Acts' },
-            { key: 'studio', icon: <Building2 size={16} />, label: 'Studio' },
-            { key: 'users', icon: <UserIcon size={16} />, label: 'Users' },
-            { key: 'tools', icon: <Sparkles size={16} />, label: 'Dev Tools' },
-          ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveAdminTab(tab.key)}
-              className={clsx(
-                "flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap",
-                activeAdminTab === tab.key
-                  ? "bg-white dark:bg-slate-700 text-pink-600 shadow-sm"
-                  : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-              )}
-            >
-              {tab.icon}
-              <span className="hidden sm:inline">{tab.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="flex gap-1.5 p-1.5 bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-x-auto">
+        {[
+          { key: 'shows', icon: <Calendar size={16} />, label: 'Shows & Acts', superOnly: false },
+          { key: 'studio', icon: <Building2 size={16} />, label: 'Studio', superOnly: true },
+          { key: 'users', icon: <UserIcon size={16} />, label: 'Users', superOnly: true },
+          { key: 'tools', icon: <Sparkles size={16} />, label: 'Dev Tools', superOnly: true },
+        ].filter(tab => !tab.superOnly || isSuperAdmin).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveAdminTab(tab.key)}
+            className={clsx(
+              "flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap",
+              activeAdminTab === tab.key
+                ? "bg-white dark:bg-slate-700 text-pink-600 shadow-sm"
+                : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            )}
+          >
+            {tab.icon}
+            <span className="hidden sm:inline">{tab.label}</span>
+          </button>
+        ))}
+      </div>
 
       {/* ══════════════════════════════════════════════════════════
           TAB: SHOWS & ACTS
@@ -627,9 +667,17 @@ export default function AdminDashboard({ recitalData, setRecitalData, currentAct
                     </tbody>
                   </table>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2">
-                  The <strong>show</strong> column groups acts into separate performances. Performers are separated by semicolons.
-                </p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-[10px] text-slate-400">
+                    The <strong>show</strong> column groups acts. Performers separated by semicolons.
+                  </p>
+                  <button
+                    onClick={downloadCsvTemplate}
+                    className="flex items-center gap-1 text-[10px] font-bold text-pink-600 hover:text-pink-700 transition-colors shrink-0 ml-3"
+                  >
+                    <Download size={11} /> Template
+                  </button>
+                </div>
               </div>
 
               {/* Progress log */}
@@ -733,7 +781,12 @@ export default function AdminDashboard({ recitalData, setRecitalData, currentAct
                         )}>
                           {show.label}
                         </div>
-                        <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 font-bold">
+                        {formatShowDate(show.id) && (
+                          <div className="text-[10px] font-bold text-slate-400 mt-0.5 flex items-center gap-1">
+                            <Calendar size={10} /> {formatShowDate(show.id)}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400 font-bold">
                           <span className="flex items-center gap-1">
                             <Hash size={12} /> {show.acts?.length || 0} acts
                           </span>
@@ -791,17 +844,26 @@ export default function AdminDashboard({ recitalData, setRecitalData, currentAct
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={toggleTracking}
-                  className={clsx(
-                    "flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all active:scale-95",
-                    currentAct?.isTracking
-                      ? "bg-red-500 text-white shadow-md shadow-red-500/20 hover:bg-red-600"
-                      : "bg-emerald-500 text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-600"
-                  )}
-                >
-                  {currentAct?.isTracking ? <><Square size={14} /> Stop</> : <><Play size={14} /> Go Live</>}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowNightMode(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold text-sm transition-all active:scale-95 hover:bg-slate-700 dark:hover:bg-slate-100"
+                    title="Open show night controller"
+                  >
+                    <Tv2 size={14} /> <span className="hidden sm:inline">Show Night</span>
+                  </button>
+                  <button
+                    onClick={toggleTracking}
+                    className={clsx(
+                      "flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all active:scale-95",
+                      currentAct?.isTracking
+                        ? "bg-red-500 text-white shadow-md shadow-red-500/20 hover:bg-red-600"
+                        : "bg-emerald-500 text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-600"
+                    )}
+                  >
+                    {currentAct?.isTracking ? <><Square size={14} /> Stop</> : <><Play size={14} /> Go Live</>}
+                  </button>
+                </div>
               </div>
 
               {/* Tracker Controls (visible when tracking is active) */}
@@ -928,9 +990,17 @@ export default function AdminDashboard({ recitalData, setRecitalData, currentAct
                     <Database size={20} className="text-amber-600 shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <h4 className="font-black text-sm dark:text-white mb-1">Batch Upload from CSV</h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                        This will replace all existing acts. Headers: <code className="bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded text-pink-600 text-[11px]">number, title, performers</code> (performers split by ;)
-                      </p>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Replaces all acts. Headers: <code className="bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded text-pink-600 text-[11px]">number, title, performers</code>
+                        </p>
+                        <button
+                          onClick={downloadCsvTemplate}
+                          className="flex items-center gap-1 text-[10px] font-bold text-pink-600 hover:text-pink-700 transition-colors shrink-0 ml-3"
+                        >
+                          <Download size={11} /> Template
+                        </button>
+                      </div>
                       <input
                         type="file"
                         accept=".csv"
@@ -1393,13 +1463,11 @@ function SortableActCard({ act, idx, updateAct, onRemove }) {
       </div>
 
       {/* Right: Performers */}
-      <div className="flex-1">
-        <label className="text-[8px] font-black text-slate-300 uppercase block mb-1">Dancers (one per line or comma-separated)</label>
-        <textarea
-          className="w-full p-3 text-sm dark:text-white bg-slate-50 dark:bg-slate-900 rounded-lg border-none outline-none focus:ring-1 focus:ring-pink-500 min-h-[80px] resize-none"
-          value={act.performers?.join('\n') || ''}
-          onChange={e => updateAct(idx, 'performers', e.target.value)}
-          onKeyDown={e => e.stopPropagation()}
+      <div className="flex-1" onKeyDown={e => e.stopPropagation()}>
+        <label className="text-[8px] font-black text-slate-300 uppercase block mb-1.5">Dancers</label>
+        <PerformerEditor
+          performers={act.performers || []}
+          onChange={(newPerformers) => updateAct(idx, 'performers', newPerformers)}
         />
       </div>
 

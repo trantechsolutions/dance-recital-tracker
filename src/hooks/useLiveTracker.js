@@ -8,6 +8,7 @@ export function useLiveTracker(orgId, selectedShowId) {
   const [recitalData, setRecitalData] = useState(null);
   const [currentAct, setCurrentAct] = useState({ number: null, title: '', isTracking: false });
   const [loading, setLoading] = useState(true);
+  const [liveShowId, setLiveShowId] = useState(null);
 
   // 1. Real-time subscription for shows + acts for an org
   useEffect(() => {
@@ -56,6 +57,21 @@ export function useLiveTracker(orgId, selectedShowId) {
 
         console.log(`Program Data Loaded for Org [${orgId}]:`, Object.keys(data));
         setRecitalData(data);
+
+        // Find which show (if any) is currently live
+        try {
+          const showIds = Object.keys(data);
+          let foundLive = null;
+          for (const sid of showIds) {
+            const statusSnap = await getDocs(query(
+              collection(db, 'show_status'),
+              where('show_id', '==', sid),
+              where('is_tracking', '==', true)
+            ));
+            if (!statusSnap.empty) { foundLive = sid; break; }
+          }
+          setLiveShowId(foundLive);
+        } catch { /* non-critical */ }
       } catch (err) {
         console.error("Firestore Program Error:", err);
       } finally {
@@ -123,6 +139,7 @@ export function useLiveTracker(orgId, selectedShowId) {
     recitalData,
     currentAct,
     loading,
+    liveShowId,
     setRecitalData,
     updateActNumber,
     toggleTracking

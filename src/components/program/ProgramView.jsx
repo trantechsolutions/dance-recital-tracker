@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Share2, Check, Printer, Music, Users, Hash, BarChart3 } from 'lucide-react';
+import { Share2, Check, Printer, Music, Users, Hash, BarChart3, Radio } from 'lucide-react';
 import ActCard from './ActCard';
 import ActDetailModal from './ActDetailModal';
 
@@ -8,7 +8,9 @@ export default function ProgramView({ showData, selectedShow, currentAct }) {
   const { orgId, favorites, toggleFavorite } = useApp();
   const [copied, setCopied] = useState(false);
   const [selectedAct, setSelectedAct] = useState(null);
+  const [showJumpPill, setShowJumpPill] = useState(false);
   const programRef = useRef(null);
+  const currentCardObserver = useRef(null);
 
   const stats = useMemo(() => {
     if (!showData?.acts) return null;
@@ -21,6 +23,33 @@ export default function ProgramView({ showData, selectedShow, currentAct }) {
     if (!showData?.acts?.length || !currentAct?.isTracking) return null;
     return Math.min(Math.round((currentAct.number / showData.acts.length) * 100), 100);
   }, [showData, currentAct]);
+
+  // Scroll to current act when it changes, and manage the "Jump" pill visibility
+  useEffect(() => {
+    if (!currentAct?.isTracking || !currentAct?.number) return;
+
+    const card = document.querySelector('[data-current-act="true"]');
+    if (!card) return;
+
+    // Auto-scroll to the current act card
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Use IntersectionObserver to show/hide the jump pill
+    if (currentCardObserver.current) currentCardObserver.current.disconnect();
+
+    currentCardObserver.current = new IntersectionObserver(
+      ([entry]) => setShowJumpPill(!entry.isIntersecting),
+      { threshold: 0.5 }
+    );
+    currentCardObserver.current.observe(card);
+
+    return () => currentCardObserver.current?.disconnect();
+  }, [currentAct?.number, currentAct?.isTracking]);
+
+  const scrollToCurrentAct = useCallback(() => {
+    const card = document.querySelector('[data-current-act="true"]');
+    card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
 
   const handleShare = async () => {
     const baseUrl = window.location.origin + window.location.pathname;
@@ -107,6 +136,19 @@ export default function ProgramView({ showData, selectedShow, currentAct }) {
             className="h-full bg-gradient-to-r from-pink-500 to-rose-500 rounded-full transition-all duration-1000 ease-out"
             style={{ width: `${progress}%` }}
           />
+        </div>
+      )}
+
+      {/* "Now Playing" jump pill — shown when current act card is off-screen */}
+      {currentAct?.isTracking && showJumpPill && (
+        <div className="sticky top-14 z-30 flex justify-center pointer-events-none">
+          <button
+            onClick={scrollToCurrentAct}
+            className="pointer-events-auto flex items-center gap-2 px-4 py-2 bg-pink-600 text-white rounded-full text-xs font-bold shadow-lg shadow-pink-500/30 animate-in fade-in slide-in-from-top-2 duration-200 hover:bg-pink-700 transition-colors"
+          >
+            <Radio size={12} className="animate-pulse" />
+            Now Playing — Act {currentAct.number}
+          </button>
         </div>
       )}
 
