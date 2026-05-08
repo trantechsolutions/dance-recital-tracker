@@ -7,10 +7,10 @@ export default function SidebarLink({ active, to, icon, label, badge }) {
     <Link
       to={to}
       className={clsx(
-        "w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 font-bold text-sm relative",
+        "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-bold text-sm relative",
         active
-          ? "bg-pink-600 text-white shadow-xl shadow-pink-500/20 translate-x-1"
-          : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-white"
+          ? "bg-pink-600 text-white shadow-lg shadow-pink-500/20"
+          : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
       )}
     >
       {icon}

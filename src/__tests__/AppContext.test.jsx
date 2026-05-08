@@ -1,0 +1,310 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, act, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import React from 'react';
+import { MemoryRouter } from 'react-router-dom';
+import { onAuthStateChanged } from 'firebase/auth';
+import { getDoc, setDoc } from 'firebase/firestore';
+import { AppProvider, useApp } from '../context/AppContext';
+
+// Test consumer to expose context values
+function ContextConsumer({ onRender }) {
+  const ctx = useApp();
+  onRender(ctx);
+  return null;
+}
+
+const renderWithProvider = (onRender) =>
+  render(
+    <MemoryRouter>
+      <AppProvider>
+        <ContextConsumer onRender={onRender} />
+      </AppProvider>
+    </MemoryRouter>
+  );
+
+describe('AppContext', () => {
+  let authCallback;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+
+    onAuthStateChanged.mockImplementation((auth, cb) => {
+      authCallback = cb;
+      return vi.fn(); // unsubscribe
+    });
+
+    getDoc.mockResolvedValue({ exists: () => false, data: () => ({}) });
+    setDoc.mockResolvedValue(undefined);
+  });
+
+  it('starts with isAuthChecking=true and user=null', () => {
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+    expect(captured.isAuthChecking).toBe(true);
+    expect(captured.user).toBeNull();
+  });
+
+  it('sets isAuthChecking=false after auth resolves with no user', async () => {
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(null);
+    });
+
+    expect(captured.isAuthChecking).toBe(false);
+    expect(captured.user).toBeNull();
+    expect(captured.isAuthorized).toBe(false);
+  });
+
+  it('sets user and isSuperAdmin=true when email is in authorizedUsers', async () => {
+    const mockUser = { uid: 'u1', email: 'superadmin@test.com' };
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(mockUser);
+    });
+
+    expect(captured.user).toBe(mockUser);
+    expect(captured.isSuperAdmin).toBe(true);
+    expect(captured.isAuthorized).toBe(true);
+  });
+
+  it('sets isSuperAdmin=false for non-authorized email', async () => {
+    const mockUser = { uid: 'u2', email: 'dancer@example.com' };
+    getDoc.mockResolvedValue({ exists: () => false, data: () => ({}) });
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(mockUser);
+    });
+
+    expect(captured.isSuperAdmin).toBe(false);
+    expect(captured.isAuthorized).toBe(false);
+  });
+
+  it('loads favorites from Firestore profile on login', async () => {
+    const mockUser = { uid: 'u3', email: 'fan@example.com' };
+    getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ favorites: ['Alice', 'Bob'] }),
+    });
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(mockUser);
+    });
+
+    expect(captured.favorites.has('Alice')).toBe(true);
+    expect(captured.favorites.has('Bob')).toBe(true);
+  });
+
+  it('initializes empty favorites when profile has no favorites field', async () => {
+    const mockUser = { uid: 'u4', email: 'new@example.com' };
+    getDoc.mockResolvedValue({ exists: () => true, data: () => ({}) });
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(mockUser);
+    });
+
+    expect(captured.favorites.size).toBe(0);
+  });
+
+  it('clears user and favorites on logout', async () => {
+    const mockUser = { uid: 'u5', email: 'fan@example.com' };
+    getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ favorites: ['Alice'] }),
+    });
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(mockUser);
+    });
+
+    expect(captured.favorites.has('Alice')).toBe(true);
+
+    await act(async () => {
+      authCallback(null); // logout
+    });
+
+    expect(captured.user).toBeNull();
+    expect(captured.favorites.size).toBe(0);
+  });
+
+  it('upserts user profile with last_login on login', async () => {
+    const mockUser = { uid: 'u6', email: 'fan@example.com' };
+    getDoc.mockResolvedValue({ exists: () => false });
+
+    renderWithProvider(() => {});
+
+    await act(async () => {
+      authCallback(mockUser);
+    });
+
+    expect(setDoc).toHaveBeenCalledWith(
+      { type: 'docRef' },
+      expect.objectContaining({ email: 'fan@example.com', last_login: expect.any(String) }),
+      { merge: true }
+    );
+  });
+
+  it('skipLogin persists to localStorage', async () => {
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(null);
+    });
+
+    act(() => { captured.skipLogin(); });
+
+    expect(localStorage.getItem('hasSkippedLogin')).toBe('true');
+    expect(captured.hasSkippedLogin).toBe(true);
+  });
+
+  it('clearSkipLogin removes from localStorage', async () => {
+    localStorage.setItem('hasSkippedLogin', 'true');
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(null);
+    });
+
+    act(() => { captured.clearSkipLogin(); });
+
+    expect(localStorage.getItem('hasSkippedLogin')).toBeNull();
+    expect(captured.hasSkippedLogin).toBe(false);
+  });
+});
+
+describe('AppContext.toggleFavorite', () => {
+  let authCallback;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    onAuthStateChanged.mockImplementation((auth, cb) => {
+      authCallback = cb;
+      return vi.fn();
+    });
+    getDoc.mockResolvedValue({ exists: () => false });
+    setDoc.mockResolvedValue(undefined);
+  });
+
+  it('opens loginPrompt and returns false when no user is logged in', async () => {
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(null);
+    });
+
+    let result;
+    await act(async () => {
+      result = await captured.toggleFavorite('Alice');
+    });
+
+    expect(result).toBe(false);
+    expect(captured.loginPromptOpen).toBe(true);
+  });
+
+  it('adds a dancer to favorites when not already present', async () => {
+    const mockUser = { uid: 'u7', email: 'fan@example.com' };
+    getDoc.mockResolvedValue({ exists: () => false });
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(mockUser);
+    });
+
+    await act(async () => {
+      await captured.toggleFavorite('Alice');
+    });
+
+    expect(captured.favorites.has('Alice')).toBe(true);
+  });
+
+  it('removes a dancer from favorites when already present', async () => {
+    const mockUser = { uid: 'u8', email: 'fan@example.com' };
+    getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ favorites: ['Alice'] }),
+    });
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(mockUser);
+    });
+
+    await act(async () => {
+      await captured.toggleFavorite('Alice');
+    });
+
+    expect(captured.favorites.has('Alice')).toBe(false);
+  });
+
+  it('persists updated favorites array to Firestore', async () => {
+    const mockUser = { uid: 'u9', email: 'fan@example.com' };
+    getDoc.mockResolvedValue({ exists: () => false });
+    setDoc.mockClear();
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(mockUser);
+    });
+
+    setDoc.mockClear(); // clear the login upsert call
+
+    await act(async () => {
+      await captured.toggleFavorite('Bob');
+    });
+
+    await waitFor(() => {
+      expect(setDoc).toHaveBeenCalledWith(
+        { type: 'docRef' },
+        { favorites: ['Bob'] },
+        { merge: true }
+      );
+    });
+  });
+
+  it('handles toggling empty-string dancer name without crashing', async () => {
+    const mockUser = { uid: 'u10', email: 'fan@example.com' };
+    getDoc.mockResolvedValue({ exists: () => false });
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(mockUser);
+    });
+
+    await act(async () => {
+      await captured.toggleFavorite('');
+    });
+
+    expect(captured.favorites.has('')).toBe(true);
+  });
+});

@@ -4,24 +4,26 @@ import { Heart, Star, Music, ArrowRight, Clock } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Link } from 'react-router-dom';
 
-export default function MyScheduleView({ showData, currentAct }) {
+export default function MyScheduleView({ showData, currentAct, showId }) {
   const { favorites, toggleFavorite } = useApp();
 
   // Build a timeline of favorited acts in order
   const schedule = useMemo(() => {
     if (!showData?.acts || !favorites || favorites.size === 0) return [];
+    const actKey = (num) => showId ? `act-${showId}-${num}` : `act-${num}`;
 
     return showData.acts
       .filter(act =>
-        favorites.has(`act-${act.number}`) ||
+        favorites.has(actKey(act.number)) ||
         act.performers?.some(p => favorites.has(p))
       )
       .map(act => ({
         ...act,
         favoritedDancers: act.performers?.filter(p => favorites.has(p)) || [],
-        isActFav: favorites.has(`act-${act.number}`),
+        isActFav: favorites.has(actKey(act.number)),
+        actKey: actKey(act.number),
       }));
-  }, [showData, favorites]);
+  }, [showData, favorites, showId]);
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -107,7 +109,7 @@ export default function MyScheduleView({ showData, currentAct }) {
       {/* Timeline */}
       <div className="relative">
         {/* Timeline line */}
-        <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-pink-100 dark:bg-pink-900/30" />
+        <div className="absolute left-[14px] sm:left-6 top-0 bottom-0 w-0.5 bg-pink-100 dark:bg-pink-900/30" />
 
         <div className="space-y-4">
           {schedule.map((act) => {
@@ -116,10 +118,10 @@ export default function MyScheduleView({ showData, currentAct }) {
             const isUpNext = currentAct?.isTracking && currentAct.number === act.number - 1;
 
             return (
-              <div key={act.number} className="relative pl-14">
+              <div key={act.number} className="relative pl-10 sm:pl-14">
                 {/* Timeline dot */}
                 <div className={clsx(
-                  "absolute left-[18px] top-5 w-5 h-5 rounded-full border-[3px] z-10 transition-all",
+                  "absolute left-[6px] sm:left-[18px] top-5 w-5 h-5 rounded-full border-[3px] z-10 transition-all",
                   isCurrent
                     ? "bg-pink-600 border-pink-300 scale-125 shadow-lg shadow-pink-500/40 animate-pulse"
                     : isPast
@@ -161,7 +163,7 @@ export default function MyScheduleView({ showData, currentAct }) {
                     </div>
 
                     <button
-                      onClick={() => toggleFavorite(`act-${act.number}`)}
+                      onClick={() => toggleFavorite(act.actKey)}
                       className={clsx(
                         "p-2 rounded-xl transition-colors shrink-0",
                         isCurrent ? "text-white/70 hover:text-white" : "text-pink-500"

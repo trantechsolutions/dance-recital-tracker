@@ -1,11 +1,22 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X, Star, Heart, Share2, Music } from 'lucide-react';
 import { clsx } from 'clsx';
 
-export default function ActDetailModal({ act, isOpen, onClose, favorites, toggleFavorite, isCurrent }) {
+export default function ActDetailModal({ act, isOpen, onClose, favorites, toggleFavorite, isCurrent, showId }) {
+  const closeButtonRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    closeButtonRef.current?.focus();
+    const handleKeyDown = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen || !act) return null;
 
-  const isActFav = favorites?.has(`act-${act.number}`);
+  const actKey = showId ? `act-${showId}-${act.number}` : `act-${act.number}`;
+  const isActFav = favorites?.has(actKey);
 
   const handleShare = async () => {
     const text = `Act #${act.number}: ${act.title}\nPerformers: ${act.performers?.join(', ') || 'N/A'}`;
@@ -37,7 +48,9 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
           )} />
 
           <button
+            ref={closeButtonRef}
             onClick={onClose}
+            aria-label="Close"
             className={clsx(
               "absolute top-3 right-3 p-2 rounded-xl transition-colors",
               isCurrent ? "text-white/70 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700"
@@ -65,7 +78,7 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
         <div className="p-4 sm:p-6 space-y-4">
           <div className="flex gap-2.5">
             <button
-              onClick={() => toggleFavorite(`act-${act.number}`)}
+              onClick={() => toggleFavorite(actKey)}
               className={clsx(
                 "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all active:scale-95",
                 isActFav

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import {
   collection, query, where, getDocs, doc, setDoc, onSnapshot, orderBy
@@ -8,18 +8,24 @@ export function useLiveTracker(orgId, selectedShowId) {
   const [recitalData, setRecitalData] = useState(null);
   const [currentAct, setCurrentAct] = useState({ number: null, title: '', isTracking: false });
   const [loading, setLoading] = useState(true);
+  const [liveShowId, setLiveShowId] = useState(null);
+
+  // Cache of already-fetched acts keyed by showId, so snapshot re-fires don't
+  // re-fetch acts for shows whose IDs haven't changed.
+  const actsCache = useRef({});
 
   // 1. Real-time subscription for shows + acts for an org
   useEffect(() => {
     if (!orgId) {
       setRecitalData(null);
       setLoading(false);
+      actsCache.current = {};
       return;
     }
 
     setLoading(true);
+    actsCache.current = {};
 
-    // Listen to shows for this org in real-time
     const showsQuery = query(collection(db, 'shows'), where('org_id', '==', orgId));
 
     const unsubShows = onSnapshot(showsQuery, async (showsSnap) => {
@@ -32,30 +38,58 @@ export function useLiveTracker(orgId, selectedShowId) {
 
         const shows = showsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        // Fetch all acts for these shows
-        const data = {};
-        for (const show of shows) {
-          const actsQuery = query(
-            collection(db, 'acts'),
-            where('show_id', '==', show.id),
-            orderBy('number', 'asc')
+        // Only fetch acts for shows not already in the cache
+        const uncached = shows.filter(s => !actsCache.current[s.id]);
+        if (uncached.length > 0) {
+          const fetched = await Promise.all(
+            uncached.map(show =>
+              getDocs(query(
+                collection(db, 'acts'),
+                where('show_id', '==', show.id),
+                orderBy('number', 'asc')
+              ))
+            )
           );
-          const actsSnap = await getDocs(actsQuery);
-          const acts = actsSnap.docs.map(d => ({
-            number: d.data().number,
-            title: d.data().title,
-            performers: d.data().performers || []
-          }));
+          uncached.forEach((show, i) => {
+            actsCache.current[show.id] = fetched[i].docs.map(d => ({
+              number: d.data().number,
+              title: d.data().title,
+              performers: d.data().performers || []
+            }));
+          });
+        }
 
+        // Remove evicted shows from cache
+        const liveIds = new Set(shows.map(s => s.id));
+        Object.keys(actsCache.current).forEach(id => {
+          if (!liveIds.has(id)) delete actsCache.current[id];
+        });
+
+        const data = {};
+        shows.forEach(show => {
           data[show.id] = {
             id: show.id,
             label: show.label,
-            acts
+            acts: actsCache.current[show.id] || []
           };
-        }
+        });
 
-        console.log(`Program Data Loaded for Org [${orgId}]:`, Object.keys(data));
         setRecitalData(data);
+
+        // Parallel check for any live show
+        try {
+          const statusResults = await Promise.all(
+            shows.map(show =>
+              getDocs(query(
+                collection(db, 'show_status'),
+                where('show_id', '==', show.id),
+                where('is_tracking', '==', true)
+              ))
+            )
+          );
+          const liveIndex = statusResults.findIndex(snap => !snap.empty);
+          setLiveShowId(liveIndex !== -1 ? shows[liveIndex].id : null);
+        } catch { /* non-critical */ }
       } catch (err) {
         console.error("Firestore Program Error:", err);
       } finally {
@@ -119,11 +153,17 @@ export function useLiveTracker(orgId, selectedShowId) {
     }, { merge: true });
   };
 
+  const invalidateActsCache = (showId) => {
+    delete actsCache.current[showId];
+  };
+
   return {
     recitalData,
     currentAct,
     loading,
+    liveShowId,
     setRecitalData,
+    invalidateActsCache,
     updateActNumber,
     toggleTracking
   };
