@@ -143,9 +143,11 @@ export default function App() {
     );
   }
 
-  if (loading) return <LoadingScreen text="Syncing Cloud" />;
+  const isAdminRoute = location.pathname.startsWith('/admin');
 
-  const isHideSelector = location.pathname.startsWith('/admin') || location.pathname.startsWith('/settings');
+  if (loading && !isAdminRoute) return <LoadingScreen text="Syncing Cloud" />;
+
+  const isHideSelector = isAdminRoute || location.pathname.startsWith('/settings');
 
   const commonProps = {
     showData: selectedShow ? recitalData?.[selectedShow] : null,

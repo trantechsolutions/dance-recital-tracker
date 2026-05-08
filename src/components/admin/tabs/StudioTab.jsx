@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useApp } from '../../../context/AppContext';
 import {
   Plus, X, Check, ChevronRight, Building2, Shield,
@@ -31,7 +31,7 @@ export default function StudioTab({ showToast, setConfirmModal, setPromptModal, 
   }, [showToast]);
 
   // Auto-load on first render
-  useState(() => { fetchAllOrgs(); });
+  useEffect(() => { fetchAllOrgs(); }, [fetchAllOrgs]);
 
   const handleCreateOrg = async () => {
     if (!newOrgForm.id || !newOrgForm.name) return showToast('ID and Name required', 'error');
