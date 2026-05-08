@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { AlertCircle, Check, Calendar, Building2, User as UserIcon, Sparkles } from 'lucide-react';
+import { AlertCircle, Check, Calendar, User as UserIcon, Sparkles } from 'lucide-react';
 import { clsx } from 'clsx';
 import { db } from '../../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import ConfirmModal from '../ui/ConfirmModal';
 import PromptModal from '../ui/PromptModal';
 import LiveShowController from './LiveShowController';
-import ShowsTab from './tabs/ShowsTab';
-import StudioTab from './tabs/StudioTab';
+import WorkspaceTab from './tabs/WorkspaceTab';
 import UsersTab from './tabs/UsersTab';
 import DevToolsTab from './tabs/DevToolsTab';
 
@@ -19,7 +18,7 @@ export default function AdminDashboard({
 }) {
   const { isSuperAdmin, orgId } = useApp();
 
-  const [activeAdminTab, setActiveAdminTab] = useState(orgId ? 'shows' : 'studio');
+  const [activeAdminTab, setActiveAdminTab] = useState('workspace');
   const [showNightMode, setShowNightMode] = useState(false);
   const [toast, setToast] = useState(null);
   const [confirmModal, setConfirmModal] = useState(null);
@@ -53,8 +52,7 @@ export default function AdminDashboard({
   };
 
   const tabs = [
-    { key: 'shows', icon: <Calendar size={16} />, label: 'Shows & Acts', superOnly: false },
-    { key: 'studio', icon: <Building2 size={16} />, label: 'Studio', superOnly: true },
+    { key: 'workspace', icon: <Calendar size={16} />, label: 'Shows & Acts', superOnly: false },
     { key: 'users', icon: <UserIcon size={16} />, label: 'Users', superOnly: true },
     { key: 'tools', icon: <Sparkles size={16} />, label: 'Dev Tools', superOnly: true },
   ].filter(tab => !tab.superOnly || isSuperAdmin);
@@ -120,8 +118,8 @@ export default function AdminDashboard({
         ))}
       </div>
 
-      {activeAdminTab === 'shows' && (
-        <ShowsTab
+      {activeAdminTab === 'workspace' && (
+        <WorkspaceTab
           recitalData={recitalData}
           setRecitalData={setRecitalData}
           invalidateActsCache={invalidateActsCache}
@@ -136,15 +134,8 @@ export default function AdminDashboard({
           editData={editData}
           setEditData={setEditData}
           orgData={orgData}
-        />
-      )}
-
-      {activeAdminTab === 'studio' && isSuperAdmin && (
-        <StudioTab
-          showToast={showToast}
-          setConfirmModal={setConfirmModal}
+          setOrgData={setOrgData}
           setPromptModal={setPromptModal}
-          setSelectedShow={setSelectedShow}
         />
       )}
 
