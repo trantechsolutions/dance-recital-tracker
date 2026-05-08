@@ -5,8 +5,7 @@ export default defineConfig({
   plugins: [
     react(),
   ],
-  base: '/dance-recital-tracker/',
-  test: {
+test: {
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.js'],
