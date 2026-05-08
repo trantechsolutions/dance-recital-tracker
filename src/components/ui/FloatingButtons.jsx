@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ArrowUp, Radio } from 'lucide-react';
 
 export default function FloatingButtons({ currentAct }) {
+  const location = useLocation();
   const [showBackToTop, setShowBackToTop] = useState(false);
 
   useEffect(() => {
@@ -17,24 +19,31 @@ export default function FloatingButtons({ currentAct }) {
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
+  // Jump-to-live only makes sense on the Program view where act cards are rendered
+  const isOnProgramRoute = location.pathname === '/';
+  const showLiveJump = currentAct?.isTracking && isOnProgramRoute;
+
+  const hasButtons = showLiveJump || showBackToTop;
+  if (!hasButtons) return null;
+
   return (
-    <div className="fixed right-3 bottom-20 md:bottom-6 z-30 flex flex-col gap-2">
-      {currentAct?.isTracking && (
+    <div className="fixed right-4 bottom-24 md:bottom-8 z-30 flex flex-col gap-2.5">
+      {showLiveJump && (
         <button
           onClick={scrollToCurrentAct}
-          className="w-11 h-11 bg-pink-600 text-white rounded-full shadow-lg shadow-pink-500/30 flex items-center justify-center hover:bg-pink-700 active:scale-90 transition-all"
-          title="Jump to current act"
+          aria-label="Jump to current act"
+          className="w-12 h-12 bg-pink-600 text-white rounded-2xl shadow-xl shadow-pink-500/30 flex items-center justify-center hover:bg-pink-700 active:scale-90 transition-all"
         >
-          <Radio size={18} className="animate-pulse" />
+          <Radio size={20} className="animate-pulse" />
         </button>
       )}
       {showBackToTop && (
         <button
           onClick={scrollToTop}
-          className="w-11 h-11 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-90 transition-all"
-          title="Back to top"
+          aria-label="Back to top"
+          className="w-12 h-12 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 flex items-center justify-center hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-90 transition-all"
         >
-          <ArrowUp size={18} />
+          <ArrowUp size={20} />
         </button>
       )}
     </div>

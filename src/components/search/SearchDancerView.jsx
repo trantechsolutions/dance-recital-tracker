@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { Star, Search as SearchIcon, Cloud, Share2, Check, Heart, Hash } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
@@ -7,7 +7,16 @@ import { clsx } from 'clsx';
 export default function SearchDancerView({ showData, selectedShow, favorites, toggleFavorite, user }) {
   const { orgId } = useApp();
   const [searchParams] = useSearchParams();
+  const [inputValue, setInputValue] = useState(() => searchParams.get('q') || '');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
+  const debounceTimer = useRef(null);
+
+  const handleSearchChange = useCallback((e) => {
+    const val = e.target.value;
+    setInputValue(val);
+    clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => setSearchQuery(val), 250);
+  }, []);
   const [copied, setCopied] = useState(false);
 
   const handleShare = async () => {
@@ -127,8 +136,8 @@ export default function SearchDancerView({ showData, selectedShow, favorites, to
             type="text"
             placeholder="Search dancers..."
             className="w-full bg-white dark:bg-slate-800 p-3.5 sm:p-4 pl-10 sm:pl-12 rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 font-bold text-[15px] sm:text-lg dark:text-white outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/10 transition-all"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={inputValue}
+            onChange={handleSearchChange}
           />
         </div>
         <button

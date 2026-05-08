@@ -1,14 +1,23 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Search as SearchIcon, Cloud, Share2, Check, Music } from 'lucide-react';
 import ActCard from '../program/ActCard';
 import ActDetailModal from '../program/ActDetailModal';
 
-export default function SearchActView({ showData, selectedShow, favorites, currentAct, toggleFavorite, user }) {
+export default function SearchActView({ showData, selectedShow, favorites, currentAct, toggleFavorite, user, showId }) {
   const { orgId } = useApp();
   const [searchParams] = useSearchParams();
+  const [inputValue, setInputValue] = useState(() => searchParams.get('q') || '');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
+  const debounceTimer = useRef(null);
+
+  const handleSearchChange = useCallback((e) => {
+    const val = e.target.value;
+    setInputValue(val);
+    clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => setSearchQuery(val), 250);
+  }, []);
   const [copied, setCopied] = useState(false);
   const [selectedAct, setSelectedAct] = useState(null);
 
@@ -41,10 +50,10 @@ export default function SearchActView({ showData, selectedShow, favorites, curre
   const favoriteActs = useMemo(() => {
     if (!showData?.acts || !favorites) return [];
     return showData.acts.filter(act =>
-      favorites.has(`act-${act.number}`) ||
+      favorites.has(showId ? `act-${showId}-${act.number}` : `act-${act.number}`) ||
       act.performers?.some(p => favorites.has(p))
     );
-  }, [showData, favorites]);
+  }, [showData, favorites, showId]);
 
   if (!showData || !showData.acts) {
     return (
@@ -68,8 +77,8 @@ export default function SearchActView({ showData, selectedShow, favorites, curre
             type="text"
             placeholder="Search acts..."
             className="w-full bg-white dark:bg-slate-800 p-3.5 sm:p-4 pl-10 sm:pl-12 rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 font-bold text-[15px] sm:text-lg dark:text-white outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/10 transition-all"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={inputValue}
+            onChange={handleSearchChange}
           />
         </div>
         <button
@@ -89,7 +98,7 @@ export default function SearchActView({ showData, selectedShow, favorites, curre
           results.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4">
               {results.map(act => (
-                <ActCard key={act.number} act={act} isCurrent={currentAct?.isTracking && act.number === currentAct.number} toggleFavorite={toggleFavorite} favorites={favorites} onClick={() => setSelectedAct(act)} />
+                <ActCard key={act.number} act={act} isCurrent={currentAct?.isTracking && act.number === currentAct.number} toggleFavorite={toggleFavorite} favorites={favorites} onClick={() => setSelectedAct(act)} showId={showId} />
               ))}
             </div>
           ) : (
@@ -112,7 +121,7 @@ export default function SearchActView({ showData, selectedShow, favorites, curre
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4">
                 {favoriteActs.map(act => (
-                  <ActCard key={act.number} act={act} isCurrent={currentAct?.isTracking && act.number === currentAct.number} toggleFavorite={toggleFavorite} favorites={favorites} onClick={() => setSelectedAct(act)} />
+                  <ActCard key={act.number} act={act} isCurrent={currentAct?.isTracking && act.number === currentAct.number} toggleFavorite={toggleFavorite} favorites={favorites} onClick={() => setSelectedAct(act)} showId={showId} />
                 ))}
               </div>
             </div>
@@ -126,7 +135,7 @@ export default function SearchActView({ showData, selectedShow, favorites, curre
         )}
       </div>
 
-      <ActDetailModal act={selectedAct} isOpen={!!selectedAct} onClose={() => setSelectedAct(null)} favorites={favorites} toggleFavorite={toggleFavorite} isCurrent={selectedAct && currentAct?.isTracking && Number(currentAct.number) === Number(selectedAct.number)} />
+      <ActDetailModal act={selectedAct} isOpen={!!selectedAct} onClose={() => setSelectedAct(null)} favorites={favorites} toggleFavorite={toggleFavorite} isCurrent={selectedAct && currentAct?.isTracking && Number(currentAct.number) === Number(selectedAct.number)} showId={showId} />
     </div>
   );
 }

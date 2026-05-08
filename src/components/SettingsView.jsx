@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Sun, Moon, Monitor, LogOut, Info, ChevronRight, User, Building2, AlertCircle } from 'lucide-react';
+import { Sun, Moon, Monitor, LogOut, Info, ChevronRight, User, Building2, AlertCircle, ShieldAlert } from 'lucide-react';
 import { marked } from 'marked';
 import { auth, googleProvider } from '../firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signOut } from 'firebase/auth';
 import { clsx } from 'clsx';
+import ConfirmModal from './ui/ConfirmModal';
+import { getAuthErrorMessage } from '../utils/authErrors';
+import { Link } from 'react-router-dom';
 
 export default function SettingsView() {
-  const { user, setOrgId, clearSkipLogin } = useApp();
+  const { user, setOrgId, clearSkipLogin, isAuthorized } = useApp();
 
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
   const [changelog, setChangelog] = useState('');
   const [showLog, setShowLog] = useState(false);
+  const [confirmModal, setConfirmModal] = useState(null);
 
   // Auth State
   const [email, setEmail] = useState('');
@@ -49,7 +53,7 @@ export default function SettingsView() {
       setEmail('');
       setPassword('');
     } catch (err) {
-      setAuthError(err.message);
+      setAuthError(getAuthErrorMessage(err.code));
     }
   };
 
@@ -58,7 +62,8 @@ export default function SettingsView() {
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (err) {
-      setAuthError(err.message);
+      const msg = getAuthErrorMessage(err.code);
+      if (msg) setAuthError(msg);
     }
   };
 
@@ -69,17 +74,43 @@ export default function SettingsView() {
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-10 animate-in fade-in duration-500">
+      <ConfirmModal
+        isOpen={!!confirmModal}
+        title={confirmModal?.title}
+        message={confirmModal?.message}
+        variant={confirmModal?.variant}
+        confirmLabel={confirmModal?.confirmLabel}
+        onConfirm={confirmModal?.onConfirm}
+        onCancel={() => setConfirmModal(null)}
+      />
+
       <h2 className="text-xl sm:text-2xl font-black dark:text-white px-0.5">Settings</h2>
+
+      {/* Admin Console — visible on mobile only (desktop uses sidebar) */}
+      {isAuthorized && (
+        <Link
+          to="/admin"
+          className="md:hidden flex items-center justify-between w-full p-4 bg-pink-600 text-white rounded-xl font-bold shadow-lg shadow-pink-500/20 hover:bg-pink-700 active:scale-[0.98] transition-all"
+        >
+          <div className="flex items-center gap-3">
+            <ShieldAlert size={18} />
+            <span>Admin Console</span>
+          </div>
+          <ChevronRight size={18} className="opacity-70" />
+        </Link>
+      )}
 
       {/* Organization Section */}
       <section className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
         <h3 className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest">Organization</h3>
         <button
-          onClick={() => {
-            if(window.confirm("Are you sure you want to switch studios? This will clear your currently selected show.")) {
-              if (setOrgId) setOrgId(null);
-            }
-          }}
+          onClick={() => setConfirmModal({
+            title: 'Switch Studio',
+            message: 'Are you sure you want to switch studios? This will clear your currently selected show.',
+            variant: 'warning',
+            confirmLabel: 'Switch',
+            onConfirm: () => { setConfirmModal(null); if (setOrgId) setOrgId(null); },
+          })}
           className="w-full p-4 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-xl font-bold flex items-center justify-between border border-slate-200 dark:border-slate-700 hover:border-pink-500 transition-colors active:scale-95"
         >
           <div className="flex items-center gap-3">

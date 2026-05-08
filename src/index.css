@@ -6,10 +6,25 @@
   html {
     -webkit-tap-highlight-color: transparent;
     scroll-behavior: smooth;
+    /* Prevent font size inflation on iOS landscape */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   body {
     @apply antialiased text-slate-900 bg-slate-50 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300;
+    /* Prevent horizontal overflow on mobile */
+    overflow-x: hidden;
+  }
+
+  /* Consistent focus ring for keyboard nav */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-pink-500;
+  }
+
+  /* Remove default button/input tap flash on mobile */
+  button, a, input, select, textarea {
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
@@ -116,7 +131,7 @@
   button,
   .no-print,
   [class*="fixed"],
-  [class*="md:w-72"],
+  [class*="md:w-64"],
   [class*="bottom-0"] {
     display: none !important;
   }

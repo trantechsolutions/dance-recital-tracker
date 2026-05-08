@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { User, AlertCircle } from 'lucide-react';
+import { Music, ChevronDown, AlertCircle } from 'lucide-react';
 import { auth, googleProvider } from '../firebase';
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuthErrorMessage } from '../utils/authErrors';
 
 export default function LoginScreen({ onSkip }) {
+  const [showSignIn, setShowSignIn] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
@@ -19,90 +21,117 @@ export default function LoginScreen({ onSkip }) {
         await signInWithEmailAndPassword(auth, email, password);
       }
     } catch (err) {
-      setAuthError(err.message.replace('Firebase: ', ''));
+      setAuthError(getAuthErrorMessage(err.code));
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-6 transition-colors duration-300">
       <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-700">
-        
+
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-pink-100 dark:bg-pink-900/30 text-pink-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-            <User size={40} />
+            <Music size={40} />
           </div>
-          <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Sign In</h1>
+          <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Welcome</h1>
           <p className="text-slate-500 dark:text-slate-400 font-medium px-4">
-            Create an account to securely save and sync your favorite dancers across all your devices.
+            Browse the full recital program — no account needed.
           </p>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-[2rem] shadow-sm border border-slate-200 dark:border-slate-700">
-          {authError && (
-            <div className="mb-4 flex items-center gap-2 text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-xl">
-              <AlertCircle size={16} /> {authError}
-            </div>
-          )}
-
-          <form onSubmit={handleEmailAuth} className="space-y-4">
-            <div>
-              <input 
-                type="email" 
-                placeholder="Email address" 
-                required
-                className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-xl dark:text-white border-none outline-none focus:ring-2 focus:ring-pink-500"
-                value={email} onChange={e => setEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <input 
-                type="password" 
-                placeholder="Password" 
-                required
-                minLength={6}
-                className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-xl dark:text-white border-none outline-none focus:ring-2 focus:ring-pink-500"
-                value={password} onChange={e => setPassword(e.target.value)}
-              />
-            </div>
-            <button 
-              type="submit"
-              className="w-full py-4 bg-pink-600 text-white rounded-xl font-black transition-transform active:scale-95 shadow-lg shadow-pink-500/20"
-            >
-              {isRegistering ? "Create Account" : "Sign In"}
-            </button>
-          </form>
-
-          <div className="mt-4 text-center">
-            <button 
-              type="button"
-              onClick={() => { setIsRegistering(!isRegistering); setAuthError(''); }}
-              className="text-sm font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors"
-            >
-              {isRegistering ? "Already have an account? Sign In" : "Need an account? Sign Up"}
-            </button>
-          </div>
-
-          <div className="relative flex items-center py-6">
-            <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
-            <span className="shrink-0 px-4 text-xs font-black text-slate-400 uppercase tracking-widest">Or</span>
-            <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
-          </div>
-
-          <button 
-            onClick={() => signInWithPopup(auth, googleProvider)}
-            className="w-full py-4 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors mb-4"
-          >
-            <User size={18} /> Continue with Google
-          </button>
-          
-          <button 
+        <div className="space-y-3">
+          {/* Primary CTA — Guest */}
+          <button
             onClick={onSkip}
-            className="w-full py-4 bg-transparent text-slate-500 dark:text-slate-400 rounded-xl font-bold hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
+            className="w-full py-4 bg-pink-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-pink-500/25 hover:bg-pink-700 active:scale-[0.98] transition-all"
           >
-            Continue as Guest
+            Browse Program
           </button>
-        </div>
 
+          {/* Google sign-in — secondary */}
+          <button
+            onClick={async () => {
+              setAuthError('');
+              try {
+                await signInWithPopup(auth, googleProvider);
+              } catch (err) {
+                if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+                  setAuthError(getAuthErrorMessage(err.code));
+                }
+              }
+            }}
+            className="w-full py-3.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-white rounded-2xl font-bold border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+              <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+              <path d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/>
+              <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+            </svg>
+            Continue with Google
+          </button>
+
+          {/* Expandable email sign-in */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+            <button
+              onClick={() => setShowSignIn(!showSignIn)}
+              className="w-full px-5 py-4 flex items-center justify-between text-slate-500 dark:text-slate-400 font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+            >
+              <span>Sign in with email</span>
+              <ChevronDown size={16} className={`transition-transform duration-200 ${showSignIn ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showSignIn && (
+              <div className="px-5 pb-5 border-t border-slate-100 dark:border-slate-700 pt-4 space-y-3 animate-in slide-in-from-top-1 duration-150">
+                {authError && (
+                  <div className="flex items-center gap-2 text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-xl">
+                    <AlertCircle size={16} /> {authError}
+                  </div>
+                )}
+
+                <form onSubmit={handleEmailAuth} className="space-y-3">
+                  <input
+                    type="email"
+                    placeholder="Email address"
+                    required
+                    autoComplete="email"
+                    className="w-full bg-slate-50 dark:bg-slate-900 p-3.5 rounded-xl dark:text-white border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 text-sm transition-all"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                  />
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    required
+                    minLength={6}
+                    autoComplete={isRegistering ? 'new-password' : 'current-password'}
+                    className="w-full bg-slate-50 dark:bg-slate-900 p-3.5 rounded-xl dark:text-white border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 text-sm transition-all"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 bg-pink-600 text-white rounded-xl font-bold transition-transform active:scale-95 shadow-lg shadow-pink-500/20"
+                  >
+                    {isRegistering ? 'Create Account' : 'Sign In'}
+                  </button>
+                </form>
+
+                <button
+                  type="button"
+                  onClick={() => { setIsRegistering(!isRegistering); setAuthError(''); }}
+                  className="w-full text-sm font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors py-1"
+                >
+                  {isRegistering ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <p className="text-center text-[11px] text-slate-400 font-medium pt-1">
+            Sign in to save and sync favorites across devices
+          </p>
+        </div>
       </div>
     </div>
   );

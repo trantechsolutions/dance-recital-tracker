@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { auth, db, authorizedUsers } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -8,9 +8,11 @@ const AppContext = createContext();
 export function AppProvider({ children }) {
   // --- Global State ---
   const [user, setUser] = useState(null);
-  const [isAuthorized, setIsAuthorized] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isStudioAdmin, setIsStudioAdmin] = useState(false);
+
+  // Derived — no independent state; eliminates the dual-writer race
+  const isAuthorized = useMemo(() => isSuperAdmin || isStudioAdmin, [isSuperAdmin, isStudioAdmin]);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [hasSkippedLogin, setHasSkippedLogin] = useState(() => localStorage.getItem('hasSkippedLogin') === 'true');
   const [favorites, setFavorites] = useState(new Set());
@@ -36,8 +38,8 @@ export function AppProvider({ children }) {
           await handleUserLogin(firebaseUser);
         } else {
           setUser(null);
-          setIsAuthorized(false);
           setIsSuperAdmin(false);
+          setIsStudioAdmin(false);
           setFavorites(new Set());
         }
       } catch (err) {
@@ -61,7 +63,6 @@ export function AppProvider({ children }) {
     setUser(u);
     const isSuper = u && authorizedUsers.includes(u.email);
     setIsSuperAdmin(isSuper);
-    setIsAuthorized(isSuper);
 
     // Fetch user profile & favorites
     const profileRef = doc(db, 'user_profiles', u.uid);
@@ -102,7 +103,6 @@ export function AppProvider({ children }) {
         setOrgName(data.name || '');
         const studioAdmin = !!(user && data.admins?.includes(user.email));
         setIsStudioAdmin(studioAdmin);
-        setIsAuthorized(prev => prev || studioAdmin);
       } catch (err) {
         console.error('[Org] Failed to fetch org:', err);
       }
@@ -117,6 +117,7 @@ export function AppProvider({ children }) {
       return false;
     }
 
+    // Capture previous state for rollback
     setFavorites(prev => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
@@ -125,7 +126,10 @@ export function AppProvider({ children }) {
       const newFavArray = Array.from(next);
       const profileRef = doc(db, 'user_profiles', user.uid);
       setDoc(profileRef, { favorites: newFavArray }, { merge: true })
-        .catch(err => console.error("Failed to sync favorites:", err));
+        .catch(() => {
+          // Roll back optimistic update on write failure
+          setFavorites(prev);
+        });
 
       return next;
     });

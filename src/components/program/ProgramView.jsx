@@ -4,7 +4,7 @@ import { Share2, Check, Printer, Music, Users, Hash, BarChart3, Radio } from 'lu
 import ActCard from './ActCard';
 import ActDetailModal from './ActDetailModal';
 
-export default function ProgramView({ showData, selectedShow, currentAct }) {
+export default function ProgramView({ showData, selectedShow, currentAct, showId }) {
   const { orgId, favorites, toggleFavorite } = useApp();
   const [copied, setCopied] = useState(false);
   const [selectedAct, setSelectedAct] = useState(null);
@@ -162,6 +162,7 @@ export default function ProgramView({ showData, selectedShow, currentAct }) {
             favorites={favorites}
             toggleFavorite={toggleFavorite}
             onClick={() => setSelectedAct(act)}
+            showId={showId}
           />
         ))}
       </div>
@@ -173,6 +174,7 @@ export default function ProgramView({ showData, selectedShow, currentAct }) {
         favorites={favorites}
         toggleFavorite={toggleFavorite}
         isCurrent={selectedAct && currentAct?.isTracking && Number(currentAct.number) === Number(selectedAct.number)}
+        showId={showId}
       />
     </div>
   );
