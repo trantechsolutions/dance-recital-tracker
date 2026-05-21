@@ -12,14 +12,19 @@
   }
 
   body {
-    @apply antialiased text-slate-900 bg-slate-50 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300;
-    /* Prevent horizontal overflow on mobile */
+    @apply font-sans antialiased text-ink-900 bg-ink-50 dark:bg-ink-900 dark:text-ink-100 transition-colors duration-300;
+    font-feature-settings: 'ss01', 'cv11';
     overflow-x: hidden;
   }
 
-  /* Consistent focus ring for keyboard nav */
+  /* Display face uses optical-size for crisp rendering at large sizes */
+  .font-display {
+    font-feature-settings: 'ss01';
+    font-variation-settings: 'opsz' 96;
+  }
+
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-pink-500;
+    @apply outline-2 outline-offset-2 outline-brand-500;
   }
 
   /* Remove default button/input tap flash on mobile */
@@ -33,10 +38,10 @@
   width: 8px;
 }
 .dark ::-webkit-scrollbar-track {
-  @apply bg-slate-900;
+  @apply bg-ink-900;
 }
 .dark ::-webkit-scrollbar-thumb {
-  @apply bg-slate-700 rounded-full;
+  @apply bg-ink-700 rounded-full;
 }
 
 /* Safe area padding for notched phones */
@@ -170,8 +175,8 @@
     text-shadow: none !important;
   }
 
-  .print-program > div .text-pink-600,
-  .print-program > div .text-pink-400 {
+  .print-program > div .text-brand-600,
+  .print-program > div .text-brand-400 {
     font-weight: bold !important;
   }
 

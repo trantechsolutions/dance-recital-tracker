@@ -84,13 +84,13 @@ export default function SettingsView() {
         onCancel={() => setConfirmModal(null)}
       />
 
-      <h2 className="text-xl sm:text-2xl font-black dark:text-white px-0.5">Settings</h2>
+      <h2 className="text-xl sm:text-2xl font-semibold dark:text-white px-0.5">Settings</h2>
 
-      {/* Admin Console — visible on mobile only (desktop uses sidebar) */}
+      {/* Admin Console â€” visible on mobile only (desktop uses sidebar) */}
       {isAuthorized && (
         <Link
           to="/admin"
-          className="md:hidden flex items-center justify-between w-full p-4 bg-pink-600 text-white rounded-xl font-bold shadow-lg shadow-pink-500/20 hover:bg-pink-700 active:scale-[0.98] transition-all"
+          className="md:hidden flex items-center justify-between w-full p-4 bg-brand-600 text-white rounded-card font-bold shadow-lg shadow-brand-500/20 hover:bg-brand-700 active:scale-[0.98] transition-all"
         >
           <div className="flex items-center gap-3">
             <ShieldAlert size={18} />
@@ -101,8 +101,8 @@ export default function SettingsView() {
       )}
 
       {/* Organization Section */}
-      <section className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-        <h3 className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest">Organization</h3>
+      <section className="bg-white dark:bg-ink-800 p-4 sm:p-6 rounded-card sm:rounded-card border border-ink-200 dark:border-ink-700 shadow-sm">
+        <h3 className="text-[10px] font-semibold uppercase text-ink-400 mb-4 tracking-widest">Organization</h3>
         <button
           onClick={() => setConfirmModal({
             title: 'Switch Studio',
@@ -111,22 +111,22 @@ export default function SettingsView() {
             confirmLabel: 'Switch',
             onConfirm: () => { setConfirmModal(null); if (setOrgId) setOrgId(null); },
           })}
-          className="w-full p-4 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-xl font-bold flex items-center justify-between border border-slate-200 dark:border-slate-700 hover:border-pink-500 transition-colors active:scale-95"
+          className="w-full p-4 bg-ink-50 dark:bg-ink-900 text-ink-700 dark:text-ink-300 rounded-card font-bold flex items-center justify-between border border-ink-200 dark:border-ink-700 hover:border-brand-500 transition-colors active:scale-95"
         >
           <div className="flex items-center gap-3">
-             <Building2 size={18} className="text-pink-600" />
+             <Building2 size={18} className="text-brand-600" />
              <span>Switch Studio</span>
           </div>
-          <ChevronRight size={18} className="text-slate-400" />
+          <ChevronRight size={18} className="text-ink-400" />
         </button>
       </section>
 
       {/* Account Section */}
-      <section className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+      <section className="bg-white dark:bg-ink-800 p-4 sm:p-6 rounded-card sm:rounded-card border border-ink-200 dark:border-ink-700 shadow-sm">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Account & Sync</h3>
+          <h3 className="text-[10px] font-semibold uppercase text-ink-400 tracking-widest">Account & Sync</h3>
           {!user && (
-            <span className="text-[10px] font-bold text-pink-500 bg-pink-50 dark:bg-pink-900/20 px-2 py-1 rounded-md">
+            <span className="text-[10px] font-bold text-brand-500 bg-brand-50 dark:bg-brand-900/20 px-2 py-1 rounded-md">
               Sync Favorites
             </span>
           )}
@@ -135,7 +135,7 @@ export default function SettingsView() {
         {!user ? (
           <div className="space-y-4">
             {authError && (
-              <div className="flex items-center gap-2 text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-xl">
+              <div className="flex items-center gap-2 text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-card">
                 <AlertCircle size={16} /> {authError}
               </div>
             )}
@@ -145,7 +145,7 @@ export default function SettingsView() {
                 type="email"
                 placeholder="Email address"
                 required
-                className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-xl dark:text-white border-none outline-none focus:ring-2 focus:ring-pink-500 text-sm"
+                className="w-full bg-ink-50 dark:bg-ink-900 p-4 rounded-card dark:text-white border-none outline-none focus:ring-2 focus:ring-brand-500 text-sm"
                 value={email} onChange={e => setEmail(e.target.value)}
               />
               <input
@@ -153,12 +153,12 @@ export default function SettingsView() {
                 placeholder="Password"
                 required
                 minLength={6}
-                className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-xl dark:text-white border-none outline-none focus:ring-2 focus:ring-pink-500 text-sm"
+                className="w-full bg-ink-50 dark:bg-ink-900 p-4 rounded-card dark:text-white border-none outline-none focus:ring-2 focus:ring-brand-500 text-sm"
                 value={password} onChange={e => setPassword(e.target.value)}
               />
               <button
                 type="submit"
-                className="w-full py-4 bg-pink-600 text-white rounded-xl font-bold transition-transform active:scale-95 shadow-lg shadow-pink-500/20"
+                className="w-full py-4 bg-brand-600 text-white rounded-card font-bold transition-transform active:scale-95 shadow-lg shadow-brand-500/20"
               >
                 {isRegistering ? "Create Account" : "Sign In"}
               </button>
@@ -168,20 +168,20 @@ export default function SettingsView() {
               <button
                 type="button"
                 onClick={() => { setIsRegistering(!isRegistering); setAuthError(''); }}
-                className="text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                className="text-xs font-bold text-ink-500 hover:text-ink-800 dark:hover:text-white"
               >
                 {isRegistering ? "Already have an account? Sign In" : "Need an account? Sign Up"}
               </button>
 
               <div className="relative flex items-center py-2">
-                <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
-                <span className="shrink-0 px-4 text-xs font-bold text-slate-400 uppercase">Or</span>
-                <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
+                <div className="flex-grow border-t border-ink-200 dark:border-ink-700"></div>
+                <span className="shrink-0 px-4 text-xs font-bold text-ink-400 uppercase">Or</span>
+                <div className="flex-grow border-t border-ink-200 dark:border-ink-700"></div>
               </div>
 
               <button
                 onClick={handleGoogleSignIn}
-                className="w-full py-3 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                className="w-full py-3 bg-ink-100 dark:bg-ink-900 text-ink-700 dark:text-white rounded-card font-bold flex items-center justify-center gap-2 hover:bg-ink-200 dark:hover:bg-ink-800 transition-colors"
               >
                 <User size={18} /> Continue with Google
               </button>
@@ -190,7 +190,7 @@ export default function SettingsView() {
         ) : (
           <div className="flex items-center justify-between">
             <div className="truncate pr-4">
-              <p className="text-[10px] text-slate-400 font-black uppercase mb-0.5">Signed In As</p>
+              <p className="text-[10px] text-ink-400 font-semibold uppercase mb-0.5">Signed In As</p>
               <p className="text-sm font-bold dark:text-white truncate">{user.email}</p>
               <p className="text-xs text-emerald-500 mt-1 font-medium flex items-center gap-1">
                 Favorites backing up to cloud
@@ -198,7 +198,7 @@ export default function SettingsView() {
             </div>
             <button
               onClick={handleSignOut}
-              className="text-red-500 p-4 bg-red-50 dark:bg-red-900/20 rounded-xl hover:bg-red-100 transition-colors"
+              className="text-red-500 p-4 bg-red-50 dark:bg-red-900/20 rounded-card hover:bg-red-100 transition-colors"
               title="Sign Out"
             >
               <LogOut size={20}/>
@@ -208,8 +208,8 @@ export default function SettingsView() {
       </section>
 
       {/* Appearance Section */}
-      <section className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-        <h3 className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest">Appearance</h3>
+      <section className="bg-white dark:bg-ink-800 p-4 sm:p-6 rounded-card sm:rounded-card border border-ink-200 dark:border-ink-700 shadow-sm">
+        <h3 className="text-[10px] font-semibold uppercase text-ink-400 mb-4 tracking-widest">Appearance</h3>
         <div className="grid grid-cols-3 gap-3">
           <ThemeOption active={theme === 'light'} onClick={() => setTheme('light')} icon={<Sun size={20}/>} label="Light" />
           <ThemeOption active={theme === 'dark'} onClick={() => setTheme('dark')} icon={<Moon size={20}/>} label="Dark" />
@@ -221,16 +221,16 @@ export default function SettingsView() {
       <section>
         <button
           onClick={() => setShowLog(!showLog)}
-          className="w-full p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl flex justify-between items-center shadow-sm"
+          className="w-full p-4 bg-white dark:bg-ink-800 border border-ink-200 dark:border-ink-700 rounded-card flex justify-between items-center shadow-sm"
         >
-          <div className="flex items-center gap-3 text-slate-600 dark:text-slate-300 font-bold text-sm">
+          <div className="flex items-center gap-3 text-ink-600 dark:text-ink-300 font-bold text-sm">
             <Info size={18} /> Application History
           </div>
           <ChevronRight size={18} className={clsx("transition-transform", showLog && "rotate-90")} />
         </button>
 
         {showLog && (
-          <div className="mt-4 p-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-inner">
+          <div className="mt-4 p-6 bg-white dark:bg-ink-800 rounded-card border border-ink-200 dark:border-ink-700 shadow-inner">
             <div
               className="prose prose-sm prose-pink dark:prose-invert max-w-none"
               dangerouslySetInnerHTML={{ __html: marked.parse(changelog || '') }}
@@ -247,14 +247,14 @@ function ThemeOption({ active, onClick, icon, label }) {
     <button
       onClick={onClick}
       className={clsx(
-        "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
+        "flex flex-col items-center gap-2 p-4 rounded-card border-2 transition-all",
         active
-          ? "border-pink-600 bg-pink-50 dark:bg-pink-900/20 text-pink-600 shadow-inner"
-          : "border-slate-100 dark:border-slate-700 text-slate-400 grayscale opacity-70"
+          ? "border-brand-600 bg-brand-50 dark:bg-brand-900/20 text-brand-600 shadow-inner"
+          : "border-ink-100 dark:border-ink-700 text-ink-400 grayscale opacity-70"
       )}
     >
       {icon}
-      <span className="text-[9px] font-black uppercase tracking-tighter">{label}</span>
+      <span className="text-[9px] font-semibold uppercase tracking-tighter">{label}</span>
     </button>
   );
 }

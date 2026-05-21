@@ -68,13 +68,13 @@ export default function ProgramView({ showData, selectedShow, currentAct, showId
 
   if (!showData) {
     return (
-      <div className="text-center py-12 sm:py-20 bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm space-y-3">
-        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-pink-50 dark:bg-pink-900/20 rounded-full flex items-center justify-center mx-auto">
-          <Music size={28} className="text-pink-300 dark:text-pink-700" />
+      <div className="text-center py-12 sm:py-20 bg-white dark:bg-ink-800 rounded-card sm:rounded-card border border-ink-100 dark:border-ink-700 shadow-sm space-y-3">
+        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-brand-50 dark:bg-brand-900/20 rounded-full flex items-center justify-center mx-auto">
+          <Music size={28} className="text-brand-300 dark:text-brand-700" />
         </div>
         <div>
-          <h3 className="text-base sm:text-lg font-black dark:text-white mb-1">No Performance Selected</h3>
-          <p className="text-slate-400 text-sm max-w-sm mx-auto px-4">
+          <h3 className="text-base sm:text-lg font-semibold dark:text-white mb-1">No Performance Selected</h3>
+          <p className="text-ink-400 text-sm max-w-sm mx-auto px-4">
             Choose a performance from the dropdown above to view its program.
           </p>
         </div>
@@ -87,21 +87,21 @@ export default function ProgramView({ showData, selectedShow, currentAct, showId
       {/* Header */}
       <div className="flex justify-between items-end px-0.5">
         <div className="min-w-0 flex-1">
-          <h2 className="text-xl sm:text-3xl font-black dark:text-white leading-tight truncate">{showData.label}</h2>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-0.5">
+          <h2 className="text-xl sm:text-3xl font-semibold dark:text-white leading-tight truncate">{showData.label}</h2>
+          <p className="text-ink-400 text-[10px] font-semibold uppercase tracking-widest mt-0.5">
             Official Program
           </p>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={() => window.print()}
-            className="hidden sm:flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 text-sm shadow-sm hover:bg-slate-50 transition-all"
+            className="hidden sm:flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-ink-800 rounded-card border border-ink-200 dark:border-ink-700 text-ink-500 text-sm shadow-sm hover:bg-ink-50 transition-all"
           >
             <Printer size={16} />
           </button>
           <button
             onClick={handleShare}
-            className="flex items-center gap-1.5 px-3 sm:px-4 py-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-pink-600 font-bold text-sm shadow-sm hover:bg-pink-50 transition-all"
+            className="flex items-center gap-1.5 px-3 sm:px-4 py-2.5 bg-white dark:bg-ink-800 rounded-card border border-ink-200 dark:border-ink-700 text-brand-600 font-bold text-sm shadow-sm hover:bg-brand-50 transition-all"
           >
             {copied ? <><Check size={16} className="text-emerald-500" /> <span className="hidden sm:inline">Copied</span></> : <><Share2 size={16} /> <span className="hidden sm:inline">Share</span></>}
           </button>
@@ -111,18 +111,18 @@ export default function ProgramView({ showData, selectedShow, currentAct, showId
       {/* Stats */}
       {stats && (
         <div className="flex items-center gap-3 sm:gap-4 px-0.5 flex-wrap">
-          <div className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-slate-400">
-            <Hash size={12} className="text-pink-500" /> {stats.acts} Acts
+          <div className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-ink-400">
+            <Hash size={12} className="text-brand-500" /> {stats.acts} Acts
           </div>
-          <div className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
-          <div className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-slate-400">
-            <Users size={12} className="text-pink-500" /> {stats.performers} Performers
+          <div className="w-1 h-1 rounded-full bg-ink-300 dark:bg-ink-600" />
+          <div className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-ink-400">
+            <Users size={12} className="text-brand-500" /> {stats.performers} Performers
           </div>
           {progress !== null && (
             <>
-              <div className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
-              <div className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-slate-400">
-                <BarChart3 size={12} className="text-pink-500" /> {progress}%
+              <div className="w-1 h-1 rounded-full bg-ink-300 dark:bg-ink-600" />
+              <div className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-ink-400">
+                <BarChart3 size={12} className="text-brand-500" /> {progress}%
               </div>
             </>
           )}
@@ -131,23 +131,23 @@ export default function ProgramView({ showData, selectedShow, currentAct, showId
 
       {/* Progress Bar */}
       {progress !== null && (
-        <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+        <div className="w-full h-1.5 bg-ink-100 dark:bg-ink-800 rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-pink-500 to-rose-500 rounded-full transition-all duration-1000 ease-out"
+            className="h-full bg-gradient-to-r from-brand-500 to-brand-500 rounded-full transition-all duration-1000 ease-out"
             style={{ width: `${progress}%` }}
           />
         </div>
       )}
 
-      {/* "Now Playing" jump pill — shown when current act card is off-screen */}
+      {/* "Now Playing" jump pill â€” shown when current act card is off-screen */}
       {currentAct?.isTracking && showJumpPill && (
         <div className="sticky top-14 z-30 flex justify-center pointer-events-none">
           <button
             onClick={scrollToCurrentAct}
-            className="pointer-events-auto flex items-center gap-2 px-4 py-2 bg-pink-600 text-white rounded-full text-xs font-bold shadow-lg shadow-pink-500/30 animate-in fade-in slide-in-from-top-2 duration-200 hover:bg-pink-700 transition-colors"
+            className="pointer-events-auto flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-full text-xs font-bold shadow-lg shadow-brand-500/30 animate-in fade-in slide-in-from-top-2 duration-200 hover:bg-brand-700 transition-colors"
           >
             <Radio size={12} className="animate-pulse" />
-            Now Playing — Act {currentAct.number}
+            Now Playing â€” Act {currentAct.number}
           </button>
         </div>
       )}

@@ -32,19 +32,19 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
       <div
-        className="relative w-full sm:max-w-lg bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200"
+        className="relative w-full sm:max-w-lg bg-white dark:bg-ink-800 rounded-t-2xl sm:rounded-card shadow-2xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div className={clsx(
           "relative p-6 sm:p-8 pb-8 sm:pb-12 text-center overflow-hidden",
           isCurrent
-            ? "bg-gradient-to-br from-pink-600 to-rose-700 text-white"
-            : "bg-gradient-to-br from-pink-50 to-rose-50 dark:from-pink-900/30 dark:to-rose-900/20"
+            ? "bg-gradient-to-br from-brand-600 to-brand-700 text-white"
+            : "bg-gradient-to-br from-brand-50 to-brand-50 dark:from-brand-900/30 dark:to-brand-900/20"
         )}>
           <Music size={80} className={clsx(
             "absolute -right-3 -bottom-3 rotate-12",
-            isCurrent ? "text-white/10" : "text-pink-200/50 dark:text-pink-800/20"
+            isCurrent ? "text-white/10" : "text-brand-200/50 dark:text-brand-800/20"
           )} />
 
           <button
@@ -52,8 +52,8 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
             onClick={onClose}
             aria-label="Close"
             className={clsx(
-              "absolute top-3 right-3 p-2 rounded-xl transition-colors",
-              isCurrent ? "text-white/70 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700"
+              "absolute top-3 right-3 p-2 rounded-card transition-colors",
+              isCurrent ? "text-white/70 hover:text-white hover:bg-white/10" : "text-ink-400 hover:text-ink-600 hover:bg-ink-100 dark:hover:bg-ink-700"
             )}
           >
             <X size={20} />
@@ -62,14 +62,14 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
           {isCurrent && (
             <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm px-3 py-1 rounded-full mb-2">
               <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse" />
-              <span className="text-[9px] uppercase tracking-[0.15em] font-black">Now Performing</span>
+              <span className="text-[9px] uppercase tracking-[0.15em] font-semibold">Now Performing</span>
             </div>
           )}
 
-          <div className={clsx("text-5xl font-black mb-1 tracking-tighter", isCurrent ? "text-white" : "text-pink-600")}>
+          <div className={clsx("text-5xl font-semibold mb-1 tracking-tighter", isCurrent ? "text-white" : "text-brand-600")}>
             #{act.number}
           </div>
-          <h2 className={clsx("text-xl font-black leading-tight", isCurrent ? "text-white" : "text-slate-900 dark:text-white")}>
+          <h2 className={clsx("text-xl font-semibold leading-tight", isCurrent ? "text-white" : "text-ink-900 dark:text-white")}>
             {act.title}
           </h2>
         </div>
@@ -80,10 +80,10 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
             <button
               onClick={() => toggleFavorite(actKey)}
               className={clsx(
-                "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all active:scale-95",
+                "flex-1 flex items-center justify-center gap-2 py-3 rounded-card font-bold text-sm transition-all active:scale-95",
                 isActFav
-                  ? "bg-pink-600 text-white shadow-lg shadow-pink-500/20"
-                  : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-pink-50 dark:hover:bg-pink-900/20 hover:text-pink-600"
+                  ? "bg-brand-600 text-white shadow-lg shadow-brand-500/20"
+                  : "bg-ink-100 dark:bg-ink-700 text-ink-600 dark:text-ink-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 hover:text-brand-600"
               )}
             >
               <Star size={16} fill={isActFav ? "currentColor" : "none"} />
@@ -91,7 +91,7 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
             </button>
             <button
               onClick={handleShare}
-              className="px-4 py-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+              className="px-4 py-3 bg-ink-100 dark:bg-ink-700 text-ink-600 dark:text-ink-300 rounded-card hover:bg-ink-200 dark:hover:bg-ink-600 transition-colors"
             >
               <Share2 size={16} />
             </button>
@@ -99,7 +99,7 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
 
           {act.performers?.length > 0 && (
             <div>
-              <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 px-0.5">
+              <h3 className="text-[10px] font-semibold uppercase text-ink-400 tracking-widest mb-2 px-0.5">
                 Performers ({act.performers.length})
               </h3>
               <div className="space-y-1.5">
@@ -109,24 +109,24 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
                     <div
                       key={i}
                       className={clsx(
-                        "flex items-center justify-between p-3 rounded-xl transition-colors",
+                        "flex items-center justify-between p-3 rounded-card transition-colors",
                         isDancerFav
-                          ? "bg-pink-50 dark:bg-pink-900/20 border border-pink-100 dark:border-pink-900/30"
-                          : "bg-slate-50 dark:bg-slate-900 border border-transparent"
+                          ? "bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-900/30"
+                          : "bg-ink-50 dark:bg-ink-900 border border-transparent"
                       )}
                     >
                       <div className="flex items-center gap-2.5">
                         <div className={clsx(
-                          "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shrink-0",
+                          "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0",
                           isDancerFav
-                            ? "bg-pink-100 dark:bg-pink-900/40 text-pink-600"
-                            : "bg-slate-100 dark:bg-slate-800 text-slate-400"
+                            ? "bg-brand-100 dark:bg-brand-900/40 text-brand-600"
+                            : "bg-ink-100 dark:bg-ink-800 text-ink-400"
                         )}>
                           {performer.charAt(0).toUpperCase()}
                         </div>
                         <span className={clsx(
                           "font-bold text-sm",
-                          isDancerFav ? "text-pink-600 dark:text-pink-400" : "dark:text-white"
+                          isDancerFav ? "text-brand-600 dark:text-brand-400" : "dark:text-white"
                         )}>
                           {performer}
                         </span>
@@ -135,7 +135,7 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
                         onClick={() => toggleFavorite(performer)}
                         className={clsx(
                           "p-1.5 rounded-lg transition-colors",
-                          isDancerFav ? "text-pink-600" : "text-slate-300 hover:text-pink-500"
+                          isDancerFav ? "text-brand-600" : "text-ink-300 hover:text-brand-500"
                         )}
                       >
                         <Heart size={14} fill={isDancerFav ? "currentColor" : "none"} />

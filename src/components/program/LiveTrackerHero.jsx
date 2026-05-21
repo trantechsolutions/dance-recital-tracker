@@ -18,39 +18,32 @@ export default function LiveTrackerHero({ currentAct, favorites, showData, showI
 
   return (
     <div className="mb-5 sm:mb-8">
-      <div className="relative bg-gradient-to-br from-pink-500 via-pink-600 to-rose-600 rounded-2xl sm:rounded-3xl text-white shadow-2xl shadow-pink-500/30 overflow-hidden">
-        {/* Decorative blobs */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/[0.06] rounded-full blur-2xl" />
-          <div className="absolute -bottom-12 -left-12 w-52 h-52 bg-rose-400/20 rounded-full blur-3xl" />
-          <div className="absolute top-0 left-1/3 w-px h-full bg-white/5" />
-        </div>
-
-        <div className="relative z-10 px-5 py-6 sm:px-8 sm:py-8 text-center">
-          {/* Live badge */}
-          <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm px-3.5 py-1.5 rounded-full mb-4">
+      <div className="relative bg-spotlight rounded-card text-white shadow-stage overflow-hidden">
+        <div className="relative z-10 px-5 py-7 sm:px-8 sm:py-10 text-center">
+          {/* Live badge — pill is reserved for status */}
+          <div className="inline-flex items-center gap-2 bg-stage-500 text-ink-900 px-3 py-1 rounded-pill mb-5 shadow-sm">
             <Radio size={11} className="animate-pulse" />
-            <span className="text-[10px] uppercase tracking-[0.18em] font-black">Now Performing</span>
+            <span className="text-[10px] uppercase tracking-marquee font-bold">Now Performing</span>
           </div>
 
-          {/* Act number */}
-          <div className="text-6xl sm:text-8xl font-black tracking-tighter leading-none mb-2 drop-shadow-lg">
-            #{currentAct.number}
+          {/* Act number — the one moment of font-black weight */}
+          <div className="font-display font-black text-7xl sm:text-9xl tracking-tight leading-[0.9] mb-3">
+            {currentAct.number}
           </div>
 
-          {/* Act title */}
-          <div className="text-lg sm:text-2xl font-bold opacity-90 leading-tight px-4">
+          {/* Act title — display serif, theatrical */}
+          <div className="font-display text-xl sm:text-3xl font-medium italic leading-tight px-4 text-white/95">
             {currentAct.title}
           </div>
 
           {/* Next favorite callout */}
           {nextFavorite && actsAway !== null && (
-            <div className="mt-4 inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm px-4 py-2 rounded-xl text-sm font-bold">
-              <Heart size={13} fill="currentColor" className="text-pink-200 shrink-0" />
+            <div className="mt-6 inline-flex items-center gap-2 bg-ink-900/30 px-4 py-2 rounded-pill text-sm">
+              <Heart size={13} fill="currentColor" className="text-stage-300 shrink-0" />
               <span>
                 {actsAway === 1
-                  ? <>Your favorite is <span className="text-white font-black">up next</span> — {nextFavorite.title}</>
-                  : <><span className="text-white font-black">{actsAway} acts</span> until {nextFavorite.title}</>
+                  ? <>Your favorite is <span className="font-semibold text-stage-200">up next</span> — <span className="font-display italic">{nextFavorite.title}</span></>
+                  : <><span className="font-semibold text-stage-200">{actsAway} acts</span> until <span className="font-display italic">{nextFavorite.title}</span></>
                 }
               </span>
             </div>

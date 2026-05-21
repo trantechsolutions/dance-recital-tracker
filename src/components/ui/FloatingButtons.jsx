@@ -32,7 +32,7 @@ export default function FloatingButtons({ currentAct }) {
         <button
           onClick={scrollToCurrentAct}
           aria-label="Jump to current act"
-          className="w-12 h-12 bg-pink-600 text-white rounded-2xl shadow-xl shadow-pink-500/30 flex items-center justify-center hover:bg-pink-700 active:scale-90 transition-all"
+          className="w-12 h-12 bg-brand-600 text-white rounded-card shadow-xl shadow-brand-500/30 flex items-center justify-center hover:bg-brand-700 active:scale-90 transition-all"
         >
           <Radio size={20} className="animate-pulse" />
         </button>
@@ -41,7 +41,7 @@ export default function FloatingButtons({ currentAct }) {
         <button
           onClick={scrollToTop}
           aria-label="Back to top"
-          className="w-12 h-12 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 flex items-center justify-center hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-90 transition-all"
+          className="w-12 h-12 bg-white dark:bg-ink-800 text-ink-500 dark:text-ink-400 rounded-card shadow-xl border border-ink-100 dark:border-ink-700 flex items-center justify-center hover:bg-ink-50 dark:hover:bg-ink-700 active:scale-90 transition-all"
         >
           <ArrowUp size={20} />
         </button>

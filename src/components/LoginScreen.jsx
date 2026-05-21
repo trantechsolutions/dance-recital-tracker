@@ -26,15 +26,17 @@ export default function LoginScreen({ onSkip }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-6 transition-colors duration-300">
+    <div className="min-h-screen bg-ink-50 dark:bg-ink-900 flex flex-col items-center justify-center p-6 transition-colors duration-300">
       <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-700">
 
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-pink-100 dark:bg-pink-900/30 text-pink-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-            <Music size={40} />
+          <div className="w-20 h-20 bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Music size={36} />
           </div>
-          <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Welcome</h1>
-          <p className="text-slate-500 dark:text-slate-400 font-medium px-4">
+          <h1 className="font-display text-5xl font-medium italic text-ink-900 dark:text-white tracking-tight mb-3 leading-none">
+            Welcome
+          </h1>
+          <p className="text-ink-500 dark:text-ink-400 text-base px-4 leading-relaxed">
             Browse the full recital program — no account needed.
           </p>
         </div>
@@ -43,7 +45,7 @@ export default function LoginScreen({ onSkip }) {
           {/* Primary CTA — Guest */}
           <button
             onClick={onSkip}
-            className="w-full py-4 bg-pink-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-pink-500/25 hover:bg-pink-700 active:scale-[0.98] transition-all"
+            className="w-full py-4 bg-brand-600 text-white rounded-card font-semibold text-base hover:bg-brand-700 active:scale-[0.98] transition-all"
           >
             Browse Program
           </button>
@@ -60,7 +62,7 @@ export default function LoginScreen({ onSkip }) {
                 }
               }
             }}
-            className="w-full py-3.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-white rounded-2xl font-bold border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
+            className="w-full py-3.5 bg-white dark:bg-ink-800 text-ink-700 dark:text-white rounded-card font-semibold border border-ink-200 dark:border-ink-700 flex items-center justify-center gap-2 hover:bg-ink-50 dark:hover:bg-ink-700 transition-colors shadow-sm"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
@@ -72,19 +74,19 @@ export default function LoginScreen({ onSkip }) {
           </button>
 
           {/* Expandable email sign-in */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-ink-800 rounded-card border border-ink-200 dark:border-ink-700 shadow-sm overflow-hidden">
             <button
               onClick={() => setShowSignIn(!showSignIn)}
-              className="w-full px-5 py-4 flex items-center justify-between text-slate-500 dark:text-slate-400 font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+              className="w-full px-5 py-4 flex items-center justify-between text-ink-500 dark:text-ink-400 font-semibold text-sm hover:bg-ink-50 dark:hover:bg-ink-700/50 transition-colors"
             >
               <span>Sign in with email</span>
               <ChevronDown size={16} className={`transition-transform duration-200 ${showSignIn ? 'rotate-180' : ''}`} />
             </button>
 
             {showSignIn && (
-              <div className="px-5 pb-5 border-t border-slate-100 dark:border-slate-700 pt-4 space-y-3 animate-in slide-in-from-top-1 duration-150">
+              <div className="px-5 pb-5 border-t border-ink-100 dark:border-ink-700 pt-4 space-y-3 animate-in slide-in-from-top-1 duration-150">
                 {authError && (
-                  <div className="flex items-center gap-2 text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-xl">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-card">
                     <AlertCircle size={16} /> {authError}
                   </div>
                 )}
@@ -95,7 +97,7 @@ export default function LoginScreen({ onSkip }) {
                     placeholder="Email address"
                     required
                     autoComplete="email"
-                    className="w-full bg-slate-50 dark:bg-slate-900 p-3.5 rounded-xl dark:text-white border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 text-sm transition-all"
+                    className="w-full bg-ink-50 dark:bg-ink-900 p-3.5 rounded-card dark:text-white border border-ink-200 dark:border-ink-700 outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm transition-all"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                   />
@@ -105,13 +107,13 @@ export default function LoginScreen({ onSkip }) {
                     required
                     minLength={6}
                     autoComplete={isRegistering ? 'new-password' : 'current-password'}
-                    className="w-full bg-slate-50 dark:bg-slate-900 p-3.5 rounded-xl dark:text-white border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 text-sm transition-all"
+                    className="w-full bg-ink-50 dark:bg-ink-900 p-3.5 rounded-card dark:text-white border border-ink-200 dark:border-ink-700 outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm transition-all"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                   />
                   <button
                     type="submit"
-                    className="w-full py-3.5 bg-pink-600 text-white rounded-xl font-bold transition-transform active:scale-95 shadow-lg shadow-pink-500/20"
+                    className="w-full py-3.5 bg-brand-600 text-white rounded-card font-semibold transition-transform active:scale-95 shadow-lg shadow-brand-500/20"
                   >
                     {isRegistering ? 'Create Account' : 'Sign In'}
                   </button>
@@ -120,7 +122,7 @@ export default function LoginScreen({ onSkip }) {
                 <button
                   type="button"
                   onClick={() => { setIsRegistering(!isRegistering); setAuthError(''); }}
-                  className="w-full text-sm font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors py-1"
+                  className="w-full text-sm font-semibold text-ink-500 hover:text-ink-800 dark:hover:text-white transition-colors py-1"
                 >
                   {isRegistering ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
                 </button>
@@ -128,7 +130,7 @@ export default function LoginScreen({ onSkip }) {
             )}
           </div>
 
-          <p className="text-center text-[11px] text-slate-400 font-medium pt-1">
+          <p className="text-center text-[11px] text-ink-400 font-medium pt-1">
             Sign in to save and sync favorites across devices
           </p>
         </div>

@@ -28,10 +28,10 @@ import LoginPromptModal from './components/ui/LoginPromptModal';
 // Helper component
 function LoadingScreen({ text }) {
   return (
-    <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin"></div>
-        <div className="text-pink-600 font-bold animate-pulse tracking-widest uppercase text-[10px]">{text}</div>
+    <div className="flex h-screen items-center justify-center bg-ink-50 dark:bg-ink-900">
+      <div className="flex flex-col items-center gap-5">
+        <div className="w-11 h-11 border-[3px] border-brand-200 border-t-brand-600 rounded-full animate-spin"></div>
+        <div className="font-display text-base italic text-ink-500 dark:text-ink-400">{text}…</div>
       </div>
     </div>
   );
@@ -128,7 +128,7 @@ export default function App() {
           <div className="absolute bottom-6 right-6 z-50">
             <button
               onClick={() => navigate('/admin')}
-              className="flex items-center gap-1.5 text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400 transition-colors text-[11px] font-bold"
+              className="flex items-center gap-1.5 text-ink-400 dark:text-ink-600 hover:text-ink-600 dark:hover:text-ink-400 transition-colors text-[11px] font-semibold"
               title="Global Admin Setup"
             >
               <ShieldAlert size={13} /> Admin
@@ -158,21 +158,21 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-ink-50 dark:bg-ink-900 transition-colors duration-300 flex flex-col md:flex-row">
 
       {/* --- DESKTOP SIDEBAR --- */}
-      <nav className="hidden md:flex md:w-64 md:flex-col md:fixed md:h-full bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 px-4 py-6 z-50">
-        <div className="px-3 mb-6">
-          <h1 className="text-2xl font-black text-pink-600 tracking-tight leading-none capitalize">
+      <nav className="hidden md:flex md:w-64 md:flex-col md:fixed md:h-full bg-white dark:bg-ink-900 border-r border-ink-100 dark:border-ink-800 px-4 py-6 z-50">
+        <div className="px-3 mb-7">
+          <h1 className="font-display text-3xl font-medium text-brand-700 dark:text-brand-400 tracking-tight leading-[1.05] capitalize">
             {displayName}
           </h1>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.25em] mt-2">Recital Portal</p>
+          <p className="text-ink-400 text-[11px] font-medium uppercase tracking-marquee mt-1.5">Recital Program</p>
         </div>
 
         {orgId && (
           <button
             onClick={handleSwitchStudio}
-            className="mb-5 mx-1 flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-pink-600 dark:hover:text-pink-400 transition-colors bg-slate-50 dark:bg-slate-800 hover:bg-pink-50 dark:hover:bg-pink-950/40 px-4 py-2.5 rounded-xl border border-slate-100 dark:border-slate-700"
+            className="mb-5 mx-1 flex items-center gap-2 text-xs font-semibold text-ink-500 hover:text-brand-700 dark:hover:text-brand-400 transition-colors bg-ink-50 dark:bg-ink-800 hover:bg-brand-50 dark:hover:bg-brand-950/40 px-4 py-2.5 rounded-card border border-ink-100 dark:border-ink-700"
           >
             <Building2 size={13} /> Switch Studio
           </button>
@@ -184,20 +184,20 @@ export default function App() {
           <SidebarLink to="/my-schedule" active={location.pathname === '/my-schedule'} icon={<Heart size={18}/>} label="My Schedule" badge={favCount} />
         </div>
 
-        <div className="pt-4 space-y-1 border-t border-slate-100 dark:border-slate-800">
+        <div className="pt-4 space-y-1 border-t border-ink-100 dark:border-ink-800">
           {isAuthorized && (
             <SidebarLink to="/admin" active={location.pathname === '/admin'} icon={<ShieldAlert size={18}/>} label="Admin Console" />
           )}
           <SidebarLink to="/settings" active={location.pathname === '/settings'} icon={<Settings size={18}/>} label="Settings" />
 
           {user && (
-            <div className="mt-4 mx-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center gap-3 border border-slate-100 dark:border-slate-700">
-              <div className="w-8 h-8 bg-pink-100 dark:bg-pink-900/40 text-pink-600 rounded-full flex items-center justify-center shrink-0">
+            <div className="mt-4 mx-1 p-3 bg-ink-50 dark:bg-ink-800 rounded-card flex items-center gap-3 border border-ink-100 dark:border-ink-700">
+              <div className="w-9 h-9 bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 rounded-full flex items-center justify-center shrink-0">
                 <User size={16} />
               </div>
               <div className="overflow-hidden flex-1 min-w-0">
-                <p className="text-xs font-bold dark:text-white truncate">{user.email}</p>
-                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-500 mt-0.5">Logged In</p>
+                <p className="text-sm font-semibold dark:text-white truncate">{user.email}</p>
+                <p className="text-[11px] font-medium text-ink-500 dark:text-ink-400 mt-0.5">Signed in</p>
               </div>
             </div>
           )}
@@ -212,28 +212,28 @@ export default function App() {
           {/* Mobile header */}
           <header className="md:hidden flex items-center justify-between mb-5">
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-black text-pink-600 tracking-tight capitalize truncate">
+              <h1 className="font-display text-2xl font-medium text-brand-700 dark:text-brand-400 tracking-tight capitalize truncate leading-tight">
                 {displayName}
               </h1>
-              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mt-0.5">Recital Portal</p>
+              <p className="text-[11px] font-medium uppercase tracking-marquee text-ink-400 mt-0.5">Recital Program</p>
             </div>
             <div className="flex items-center gap-2 shrink-0 ml-3">
               {user && (
                 <div
-                  className="w-9 h-9 bg-pink-100 dark:bg-pink-900/30 text-pink-600 rounded-full flex items-center justify-center"
+                  className="w-11 h-11 bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 rounded-full flex items-center justify-center"
                   title={user.email}
                   aria-label={`Signed in as ${user.email}`}
                 >
-                  <User size={15} />
+                  <User size={16} />
                 </div>
               )}
               {orgId && (
                 <button
                   onClick={handleSwitchStudio}
                   aria-label="Switch Studio"
-                  className="w-9 h-9 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-400 hover:text-pink-600 dark:hover:text-pink-400 transition-colors flex items-center justify-center"
+                  className="w-11 h-11 bg-ink-100 dark:bg-ink-800 rounded-full text-ink-500 hover:text-brand-700 dark:hover:text-brand-400 transition-colors flex items-center justify-center"
                 >
-                  <LogOut size={15} className="rotate-180" />
+                  <LogOut size={16} className="rotate-180" />
                 </button>
               )}
             </div>
@@ -280,7 +280,7 @@ export default function App() {
 
       {/* --- MOBILE BOTTOM NAV --- */}
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 bg-white/98 dark:bg-slate-900/98 backdrop-blur-xl border-t border-slate-100 dark:border-slate-800 flex items-stretch z-40"
+        className="md:hidden fixed bottom-0 inset-x-0 bg-white dark:bg-ink-900 border-t border-ink-200 dark:border-ink-800 flex items-stretch z-40"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         <NavButton to="/" active={location.pathname === '/'} icon={<List size={20}/>} label="Program" />
