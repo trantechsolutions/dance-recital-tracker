@@ -57,12 +57,12 @@ export default function SearchActView({ showData, selectedShow, favorites, curre
 
   if (!showData || !showData.acts) {
     return (
-      <div className="text-center py-12 sm:py-20 bg-white dark:bg-slate-800 rounded-xl sm:rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm space-y-3">
-        <div className="w-16 h-16 bg-pink-50 dark:bg-pink-900/20 rounded-full flex items-center justify-center mx-auto">
-          <Music size={28} className="text-pink-300 dark:text-pink-700" />
+      <div className="text-center py-12 sm:py-20 bg-white dark:bg-ink-800 rounded-card sm:rounded-card border border-ink-100 dark:border-ink-700 shadow-sm space-y-3">
+        <div className="w-16 h-16 bg-brand-50 dark:bg-brand-900/20 rounded-full flex items-center justify-center mx-auto">
+          <Music size={28} className="text-brand-300 dark:text-brand-700" />
         </div>
-        <h3 className="text-base font-black dark:text-white">No Show Selected</h3>
-        <p className="text-slate-400 text-sm px-4">Select a show to search through the acts.</p>
+        <h3 className="text-base font-semibold dark:text-white">No Show Selected</h3>
+        <p className="text-ink-400 text-sm px-4">Select a show to search through the acts.</p>
       </div>
     );
   }
@@ -72,25 +72,25 @@ export default function SearchActView({ showData, selectedShow, favorites, curre
       {/* Search bar */}
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <SearchIcon className="absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <SearchIcon className="absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 text-ink-400" size={18} />
           <input
             type="text"
             placeholder="Search acts..."
-            className="w-full bg-white dark:bg-slate-800 p-3.5 sm:p-4 pl-10 sm:pl-12 rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 font-bold text-[15px] sm:text-lg dark:text-white outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/10 transition-all"
+            className="w-full bg-white dark:bg-ink-800 p-3.5 sm:p-4 pl-10 sm:pl-12 rounded-card sm:rounded-card shadow-sm border border-ink-200 dark:border-ink-700 font-bold text-[15px] sm:text-lg dark:text-white outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition-all"
             value={inputValue}
             onChange={handleSearchChange}
           />
         </div>
         <button
           onClick={handleShare}
-          className="bg-white dark:bg-slate-800 w-12 sm:w-[60px] rounded-xl sm:rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center text-pink-600 hover:bg-pink-50 active:scale-95 transition-all shrink-0"
+          className="bg-white dark:bg-ink-800 w-12 sm:w-[60px] rounded-card sm:rounded-card shadow-sm border border-ink-200 dark:border-ink-700 flex items-center justify-center text-brand-600 hover:bg-brand-50 active:scale-95 transition-all shrink-0"
         >
           {copied ? <Check size={20} className="text-emerald-500" /> : <Share2 size={20} />}
         </button>
       </div>
 
       {searchQuery && results.length > 0 && (
-        <p className="text-[11px] font-bold text-slate-400 px-0.5">{results.length} result{results.length !== 1 ? 's' : ''}</p>
+        <p className="text-[11px] font-bold text-ink-400 px-0.5">{results.length} result{results.length !== 1 ? 's' : ''}</p>
       )}
 
       <div>
@@ -102,17 +102,17 @@ export default function SearchActView({ showData, selectedShow, favorites, curre
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
-              <SearchIcon size={36} className="mx-auto text-slate-200 dark:text-slate-700 mb-3" />
-              <p className="text-slate-400 font-bold text-sm">No acts found for "{searchQuery}"</p>
-              <p className="text-slate-300 text-xs mt-1">Try a different search term</p>
+            <div className="text-center py-12 bg-white dark:bg-ink-800 rounded-card border border-ink-100 dark:border-ink-700">
+              <SearchIcon size={36} className="mx-auto text-ink-200 dark:text-ink-700 mb-3" />
+              <p className="text-ink-400 font-bold text-sm">No acts found for "{searchQuery}"</p>
+              <p className="text-ink-300 text-xs mt-1">Try a different search term</p>
             </div>
           )
         ) : (
           favoriteActs.length > 0 ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between px-0.5">
-                <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Your Favorited Acts</h3>
+                <h3 className="text-[10px] font-semibold uppercase text-ink-400 tracking-widest">Your Favorited Acts</h3>
                 {user && (
                   <div className="flex items-center gap-1 text-[9px] font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-md">
                     <Cloud size={10} /> Synced
@@ -126,10 +126,10 @@ export default function SearchActView({ showData, selectedShow, favorites, curre
               </div>
             </div>
           ) : (
-            <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
-              <SearchIcon size={36} className="mx-auto text-slate-200 dark:text-slate-700 mb-3" />
-              <p className="text-slate-400 font-bold text-sm">Search the program</p>
-              <p className="text-slate-300 text-xs mt-1">Find acts by title, number, or performer</p>
+            <div className="text-center py-12 bg-white dark:bg-ink-800 rounded-card border border-ink-100 dark:border-ink-700">
+              <SearchIcon size={36} className="mx-auto text-ink-200 dark:text-ink-700 mb-3" />
+              <p className="text-ink-400 font-bold text-sm">Search the program</p>
+              <p className="text-ink-300 text-xs mt-1">Find acts by title, number, or performer</p>
             </div>
           )
         )}

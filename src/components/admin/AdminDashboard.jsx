@@ -25,7 +25,7 @@ export default function AdminDashboard({
   const [promptModal, setPromptModal] = useState(null);
   const [orgData, setOrgData] = useState({ name: '', admins: [] });
 
-  // Shared state lifted for ShowsTab ↔ AdminDashboard (LiveShowController needs editData)
+  // Shared state lifted for ShowsTab â†” AdminDashboard (LiveShowController needs editData)
   const [selectedShowId, setSelectedShowId] = useState('');
   const [editData, setEditData] = useState(null);
 
@@ -71,7 +71,7 @@ export default function AdminDashboard({
 
       {toast && (
         <div className={clsx(
-          "fixed bottom-28 md:bottom-10 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl font-bold text-sm animate-in slide-in-from-bottom-5 fade-in",
+          "fixed bottom-28 md:bottom-10 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-card shadow-2xl font-bold text-sm animate-in slide-in-from-bottom-5 fade-in",
           toast.type === 'error' ? "bg-red-600 text-white" : "bg-emerald-600 text-white"
         )}>
           {toast.type === 'error' ? <AlertCircle size={20} /> : <Check size={20} />}
@@ -100,16 +100,16 @@ export default function AdminDashboard({
       />
 
       {/* Tab Navigation */}
-      <div className="flex gap-1.5 p-1.5 bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-x-auto">
+      <div className="flex gap-1.5 p-1.5 bg-ink-100 dark:bg-ink-800 rounded-card overflow-x-auto">
         {tabs.map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveAdminTab(tab.key)}
             className={clsx(
-              "flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap",
+              "flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-card font-bold text-sm transition-all whitespace-nowrap",
               activeAdminTab === tab.key
-                ? "bg-white dark:bg-slate-700 text-pink-600 shadow-sm"
-                : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                ? "bg-white dark:bg-ink-700 text-brand-600 shadow-sm"
+                : "text-ink-400 hover:text-ink-600 dark:hover:text-ink-300"
             )}
           >
             {tab.icon}

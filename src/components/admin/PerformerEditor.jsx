@@ -28,13 +28,13 @@ export default function PerformerEditor({ performers = [], onChange }) {
           {performers.map((name) => (
             <span
               key={name}
-              className="inline-flex items-center gap-1 bg-pink-50 dark:bg-pink-900/20 text-pink-700 dark:text-pink-300 text-xs font-bold px-2.5 py-1 rounded-lg"
+              className="inline-flex items-center gap-1 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 text-xs font-bold px-2.5 py-1 rounded-lg"
             >
               {name}
               <button
                 type="button"
                 onClick={() => removePerformer(name)}
-                className="text-pink-400 hover:text-pink-700 dark:hover:text-pink-100 transition-colors ml-0.5"
+                className="text-brand-400 hover:text-brand-700 dark:hover:text-brand-100 transition-colors ml-0.5"
               >
                 <X size={11} />
               </button>
@@ -50,18 +50,18 @@ export default function PerformerEditor({ performers = [], onChange }) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Add performer name…"
-          className="flex-1 px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500/30 focus:border-pink-500 dark:text-white placeholder-slate-400 transition-all"
+          placeholder="Add performer nameâ€¦"
+          className="flex-1 px-3 py-2 text-sm bg-ink-50 dark:bg-ink-900 border border-ink-200 dark:border-ink-700 rounded-card focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 dark:text-white placeholder-ink-400 transition-all"
         />
         <button
           type="button"
           onClick={addPerformer}
           disabled={!input.trim()}
           className={clsx(
-            "px-3 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1",
+            "px-3 py-2 rounded-card text-sm font-bold transition-all flex items-center gap-1",
             input.trim()
-              ? "bg-pink-600 text-white hover:bg-pink-700"
-              : "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
+              ? "bg-brand-600 text-white hover:bg-brand-700"
+              : "bg-ink-100 dark:bg-ink-800 text-ink-400 cursor-not-allowed"
           )}
         >
           <Plus size={14} /> Add

@@ -16,9 +16,9 @@ const VARIANTS = {
   },
   info: {
     icon: Info,
-    iconBg: 'bg-pink-100 dark:bg-pink-900/30',
-    iconColor: 'text-pink-600',
-    confirmBtn: 'bg-pink-600 hover:bg-pink-700 shadow-md shadow-pink-500/20 text-white',
+    iconBg: 'bg-brand-100 dark:bg-brand-900/30',
+    iconColor: 'text-brand-600',
+    confirmBtn: 'bg-brand-600 hover:bg-brand-700 shadow-md shadow-brand-500/20 text-white',
   },
 };
 
@@ -44,25 +44,25 @@ export default function ConfirmModal({
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
 
       <div
-        className="relative w-full max-w-sm bg-white dark:bg-slate-800 rounded-3xl shadow-2xl p-6 animate-in fade-in slide-in-from-bottom-4 duration-300"
+        className="relative w-full max-w-sm bg-white dark:bg-ink-800 rounded-card shadow-2xl p-6 animate-in fade-in slide-in-from-bottom-4 duration-300"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={onCancel}
-          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors rounded-xl"
+          className="absolute top-4 right-4 p-2 text-ink-400 hover:text-ink-600 dark:hover:text-ink-200 transition-colors rounded-card"
         >
           <X size={18} />
         </button>
 
         <div className="flex flex-col items-center text-center gap-4">
-          <div className={clsx('w-14 h-14 rounded-2xl flex items-center justify-center', iconBg)}>
+          <div className={clsx('w-14 h-14 rounded-card flex items-center justify-center', iconBg)}>
             <Icon size={28} className={iconColor} />
           </div>
 
           <div>
-            <h2 className="text-xl font-black dark:text-white mb-1">{title}</h2>
+            <h2 className="text-xl font-semibold dark:text-white mb-1">{title}</h2>
             {message && (
-              <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">{message}</p>
+              <p className="text-ink-500 dark:text-ink-400 text-sm leading-relaxed">{message}</p>
             )}
           </div>
 
@@ -70,7 +70,7 @@ export default function ConfirmModal({
             <button
               onClick={onConfirm}
               className={clsx(
-                'w-full flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl font-bold text-sm transition-all active:scale-95',
+                'w-full flex items-center justify-center gap-2 px-5 py-3.5 rounded-card font-bold text-sm transition-all active:scale-95',
                 confirmBtn
               )}
             >
@@ -78,7 +78,7 @@ export default function ConfirmModal({
             </button>
             <button
               onClick={onCancel}
-              className="w-full px-5 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold text-sm transition-colors"
+              className="w-full px-5 py-3 text-ink-500 dark:text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 font-bold text-sm transition-colors"
             >
               {cancelLabel}
             </button>
