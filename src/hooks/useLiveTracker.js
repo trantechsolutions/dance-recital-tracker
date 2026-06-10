@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { db } from '../firebase';
+import { db, coll } from '../firebase';
 import {
   collection, query, where, getDocs, doc, setDoc, onSnapshot, orderBy
 } from 'firebase/firestore';
@@ -26,7 +26,7 @@ export function useLiveTracker(orgId, selectedShowId) {
     setLoading(true);
     actsCache.current = {};
 
-    const showsQuery = query(collection(db, 'shows'), where('org_id', '==', orgId));
+    const showsQuery = query(collection(db, coll('shows')), where('org_id', '==', orgId));
 
     const unsubShows = onSnapshot(showsQuery, async (showsSnap) => {
       try {
@@ -38,24 +38,33 @@ export function useLiveTracker(orgId, selectedShowId) {
 
         const shows = showsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        // Only fetch acts for shows not already in the cache
-        const uncached = shows.filter(s => !actsCache.current[s.id]);
+        // Refetch acts when a show is new to the cache OR its updated_at has
+        // changed (i.e. an admin edited/removed acts). Without the version
+        // check, viewers keep serving stale acts — including dancers that were
+        // already removed — for the lifetime of the session.
+        const uncached = shows.filter(s => {
+          const cached = actsCache.current[s.id];
+          return !cached || cached.updatedAt !== (s.updated_at ?? null);
+        });
         if (uncached.length > 0) {
           const fetched = await Promise.all(
             uncached.map(show =>
               getDocs(query(
-                collection(db, 'acts'),
+                collection(db, coll('acts')),
                 where('show_id', '==', show.id),
                 orderBy('number', 'asc')
               ))
             )
           );
           uncached.forEach((show, i) => {
-            actsCache.current[show.id] = fetched[i].docs.map(d => ({
-              number: d.data().number,
-              title: d.data().title,
-              performers: d.data().performers || []
-            }));
+            actsCache.current[show.id] = {
+              updatedAt: show.updated_at ?? null,
+              acts: fetched[i].docs.map(d => ({
+                number: d.data().number,
+                title: d.data().title,
+                performers: d.data().performers || []
+              }))
+            };
           });
         }
 
@@ -70,7 +79,7 @@ export function useLiveTracker(orgId, selectedShowId) {
           data[show.id] = {
             id: show.id,
             label: show.label,
-            acts: actsCache.current[show.id] || []
+            acts: actsCache.current[show.id]?.acts || []
           };
         });
 
@@ -81,7 +90,7 @@ export function useLiveTracker(orgId, selectedShowId) {
           const statusResults = await Promise.all(
             shows.map(show =>
               getDocs(query(
-                collection(db, 'show_status'),
+                collection(db, coll('show_status')),
                 where('show_id', '==', show.id),
                 where('is_tracking', '==', true)
               ))
@@ -107,7 +116,7 @@ export function useLiveTracker(orgId, selectedShowId) {
       return;
     }
 
-    const statusRef = doc(db, 'show_status', selectedShowId);
+    const statusRef = doc(db, coll('show_status'), selectedShowId);
 
     const unsubStatus = onSnapshot(statusRef, (snap) => {
       if (!snap.exists()) {
@@ -133,7 +142,7 @@ export function useLiveTracker(orgId, selectedShowId) {
   const updateActNumber = async (num) => {
     if (!orgId || !selectedShowId) return;
 
-    await setDoc(doc(db, 'show_status', selectedShowId), {
+    await setDoc(doc(db, coll('show_status'), selectedShowId), {
       show_id: selectedShowId,
       org_id: orgId,
       current_act_number: num,
@@ -145,7 +154,7 @@ export function useLiveTracker(orgId, selectedShowId) {
   const toggleTracking = async () => {
     if (!orgId || !selectedShowId) return;
 
-    await setDoc(doc(db, 'show_status', selectedShowId), {
+    await setDoc(doc(db, coll('show_status'), selectedShowId), {
       show_id: selectedShowId,
       org_id: orgId,
       is_tracking: !currentAct.isTracking,

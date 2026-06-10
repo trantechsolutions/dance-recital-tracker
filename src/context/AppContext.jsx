@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { auth, db, authorizedUsers } from '../firebase';
+import { auth, db, authorizedUsers, coll } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
@@ -65,7 +65,7 @@ export function AppProvider({ children }) {
     setIsSuperAdmin(isSuper);
 
     // Fetch user profile & favorites
-    const profileRef = doc(db, 'user_profiles', u.uid);
+    const profileRef = doc(db, coll('user_profiles'), u.uid);
     const profileSnap = await getDoc(profileRef);
 
     if (profileSnap.exists() && profileSnap.data().favorites) {
@@ -97,7 +97,7 @@ export function AppProvider({ children }) {
     if (!orgId) return;
     const fetchOrg = async () => {
       try {
-        const snap = await getDoc(doc(db, 'organizations', orgId));
+        const snap = await getDoc(doc(db, coll('organizations'), orgId));
         if (!snap.exists()) return;
         const data = snap.data();
         setOrgName(data.name || '');
@@ -124,7 +124,7 @@ export function AppProvider({ children }) {
       else next.add(name);
 
       const newFavArray = Array.from(next);
-      const profileRef = doc(db, 'user_profiles', user.uid);
+      const profileRef = doc(db, coll('user_profiles'), user.uid);
       setDoc(profileRef, { favorites: newFavArray }, { merge: true })
         .catch(() => {
           // Roll back optimistic update on write failure

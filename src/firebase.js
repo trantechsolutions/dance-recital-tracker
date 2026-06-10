@@ -18,3 +18,8 @@ export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 export const authorizedUsers = (import.meta.env.VITE_AUTHORIZED_ADMINS || "").split(',');
 export const DB_PREFIX = import.meta.env.DEV ? 'test_' : '';
+
+// Prefix every Firestore collection name so dev/test data (DB_PREFIX='test_')
+// never commingles with production data (DB_PREFIX=''). ALWAYS route collection
+// access through this helper instead of hardcoding bare collection names.
+export const coll = (name) => `${DB_PREFIX}${name}`;

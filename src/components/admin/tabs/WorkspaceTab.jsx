@@ -11,7 +11,7 @@ import Papa from 'papaparse';
 import PerformerEditor from '../PerformerEditor';
 import {
   saveShow, createShow, uploadActsForShow, bulkImportShows,
-  createOrg, updateOrgAdmins, deleteStudio,
+  createOrg, updateOrgAdmins, deleteStudio, deleteShow,
 } from '../../../services/showService';
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor,
@@ -22,7 +22,7 @@ import {
   verticalListSortingStrategy, useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { db } from '../../../firebase';
+import { db, coll } from '../../../firebase';
 import { collection, getDocs } from 'firebase/firestore';
 
 function formatShowDate(id) {
@@ -386,6 +386,7 @@ export default function WorkspaceTab({
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [bulkImporting, setBulkImporting] = useState(false);
   const [bulkLog, setBulkLog] = useState([]);
+  const [deletingShowId, setDeletingShowId] = useState(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -396,7 +397,7 @@ export default function WorkspaceTab({
   const fetchAllOrgs = useCallback(async () => {
     setLoadingOrgs(true);
     try {
-      const snap = await getDocs(collection(db, 'organizations'));
+      const snap = await getDocs(collection(db, coll('organizations')));
       setAllOrgs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { showToast(e.message, 'error'); }
     finally { setLoadingOrgs(false); }
@@ -432,6 +433,41 @@ export default function WorkspaceTab({
       setNewShowForm({ date: '', time: '', label: '' });
       showToast('Performance created! Add acts and hit Save.', 'success');
     } catch (err) { showToast(err.message, 'error'); }
+  };
+
+  const handleDeleteShow = async (show) => {
+    setDeletingShowId(show.id);
+    try {
+      const { actCount, usersUpdated } = await deleteShow(orgId, show.id);
+      invalidateActsCache(show.id);
+      setRecitalData(prev => {
+        const next = { ...prev };
+        delete next[show.id];
+        return next;
+      });
+      if (selectedShowId === show.id) {
+        setSelectedShowId('');
+        if (setSelectedShow) setSelectedShow('');
+      }
+      showToast(`Deleted "${show.label}" (${actCount} act${actCount !== 1 ? 's' : ''}, cleaned ${usersUpdated} schedule${usersUpdated !== 1 ? 's' : ''})`, 'success');
+    } catch (err) {
+      showToast('Delete failed: ' + err.message, 'error');
+    } finally {
+      setDeletingShowId(null);
+    }
+  };
+
+  const promptDeleteShow = (show) => {
+    setPromptModal({
+      title: 'Delete Show',
+      message: `Type "${show.label}" to confirm permanent deletion of this show and all its acts. This cannot be undone.`,
+      placeholder: show.label,
+      onConfirm: (input) => {
+        setPromptModal(null);
+        if (input === show.label) handleDeleteShow(show);
+        else showToast("Name didn't match. Deletion cancelled.", 'error');
+      },
+    });
   };
 
   const updateAct = (index, field, value) => {
@@ -664,34 +700,50 @@ export default function WorkspaceTab({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {showList.map(show => {
                 const isSelected = selectedShowId === show.id;
+                const isDeleting = deletingShowId === show.id;
                 return (
-                  <button key={show.id} onClick={() => {
-                    const newId = isSelected ? '' : show.id;
-                    setSelectedShowId(newId);
-                    if (setSelectedShow) setSelectedShow(newId);
-                  }}
-                    className={clsx(
-                      "text-left p-5 rounded-2xl border-2 transition-all group",
-                      isSelected
-                        ? "border-pink-500 bg-pink-50 dark:bg-pink-900/20 shadow-md"
-                        : "border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-pink-300 dark:hover:border-pink-700 hover:shadow-sm"
-                    )}>
-                    <div className="flex justify-between items-start">
-                      <div className="min-w-0 flex-1">
-                        <div className={clsx("font-black truncate", isSelected ? "text-pink-600" : "dark:text-white")}>{show.label}</div>
-                        {formatShowDate(show.id) && (
-                          <div className="text-[10px] font-bold text-slate-400 mt-0.5 flex items-center gap-1"><Calendar size={10} /> {formatShowDate(show.id)}</div>
-                        )}
-                        <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400 font-bold">
-                          <span className="flex items-center gap-1"><Hash size={12} /> {show.acts?.length || 0} acts</span>
-                          <span className="flex items-center gap-1"><Users size={12} /> {new Set(show.acts?.flatMap(a => a.performers || [])).size} dancers</span>
+                  <div key={show.id} className="relative group">
+                    <button onClick={() => {
+                      const newId = isSelected ? '' : show.id;
+                      setSelectedShowId(newId);
+                      if (setSelectedShow) setSelectedShow(newId);
+                    }}
+                      disabled={isDeleting}
+                      className={clsx(
+                        "w-full text-left p-5 rounded-2xl border-2 transition-all",
+                        isDeleting && "opacity-50 pointer-events-none",
+                        isSelected
+                          ? "border-pink-500 bg-pink-50 dark:bg-pink-900/20 shadow-md"
+                          : "border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-pink-300 dark:hover:border-pink-700 hover:shadow-sm"
+                      )}>
+                      <div className="flex justify-between items-start">
+                        <div className="min-w-0 flex-1 pr-8">
+                          <div className={clsx("font-black truncate", isSelected ? "text-pink-600" : "dark:text-white")}>{show.label}</div>
+                          {formatShowDate(show.id) && (
+                            <div className="text-[10px] font-bold text-slate-400 mt-0.5 flex items-center gap-1"><Calendar size={10} /> {formatShowDate(show.id)}</div>
+                          )}
+                          <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400 font-bold">
+                            <span className="flex items-center gap-1"><Hash size={12} /> {show.acts?.length || 0} acts</span>
+                            <span className="flex items-center gap-1"><Users size={12} /> {new Set(show.acts?.flatMap(a => a.performers || [])).size} dancers</span>
+                          </div>
+                        </div>
+                        <div className={clsx("p-2 rounded-xl transition-colors shrink-0", isSelected ? "bg-pink-600 text-white" : "bg-slate-50 dark:bg-slate-900 text-slate-300 group-hover:text-pink-500")}>
+                          <Pencil size={16} />
                         </div>
                       </div>
-                      <div className={clsx("p-2 rounded-xl transition-colors shrink-0", isSelected ? "bg-pink-600 text-white" : "bg-slate-50 dark:bg-slate-900 text-slate-300 group-hover:text-pink-500")}>
-                        <Pencil size={16} />
-                      </div>
-                    </div>
-                  </button>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); promptDeleteShow(show); }}
+                      disabled={isDeleting}
+                      title="Delete show"
+                      aria-label={`Delete ${show.label}`}
+                      className="absolute bottom-3 right-3 p-2 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors z-10 disabled:opacity-50 disabled:cursor-wait"
+                    >
+                      {isDeleting
+                        ? <RefreshCw size={16} className="animate-spin" />
+                        : <Trash2 size={16} />}
+                    </button>
+                  </div>
                 );
               })}
             </div>

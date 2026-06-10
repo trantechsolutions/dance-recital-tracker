@@ -1,4 +1,4 @@
-import { db } from '../firebase';
+import { db, coll } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, getDoc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 
 // ── Name Pools ─────────────────────────────────────────────────────
@@ -189,7 +189,8 @@ function generateStudios() {
 
 // ── Seed ───────────────────────────────────────────────────────────
 
-const MANIFEST_REF = '_seed_manifest/latest';
+const MANIFEST_COL = '_seed_manifest';
+const MANIFEST_ID = 'latest';
 
 export async function seedDatabase(onProgress) {
   const log = (msg) => onProgress?.(msg);
@@ -208,11 +209,7 @@ export async function seedDatabase(onProgress) {
     log(`Creating studio: ${studio.name}...`);
     manifest.orgIds.push(studio.orgId);
 
-    await setDoc(doc(db, 'organizations', studio.orgId), {
-      name: studio.name,
-      admins: studio.admins,
-    });
-    await setDoc(doc(db, 'test_organizations', studio.orgId), {
+    await setDoc(doc(db, coll('organizations'), studio.orgId), {
       name: studio.name,
       admins: studio.admins,
     });
@@ -221,7 +218,7 @@ export async function seedDatabase(onProgress) {
       log(`  Show: ${show.label} (${show.acts.length} acts)...`);
       manifest.showIds.push(show.id);
 
-      await setDoc(doc(db, 'shows', show.id), {
+      await setDoc(doc(db, coll('shows'), show.id), {
         org_id: show.org_id,
         label: show.label,
       });
@@ -232,7 +229,7 @@ export async function seedDatabase(onProgress) {
         const chunk = acts.slice(i, i + 400);
         const batch = writeBatch(db);
         for (const act of chunk) {
-          const actRef = doc(collection(db, 'acts'));
+          const actRef = doc(collection(db, coll('acts')));
           batch.set(actRef, {
             show_id: show.id,
             number: act.number,
@@ -245,7 +242,7 @@ export async function seedDatabase(onProgress) {
       }
 
       // Initialize show_status
-      await setDoc(doc(db, 'show_status', show.id), {
+      await setDoc(doc(db, coll('show_status'), show.id), {
         show_id: show.id,
         org_id: show.org_id,
         current_act_number: 1,
@@ -257,7 +254,7 @@ export async function seedDatabase(onProgress) {
 
   // Save manifest so clear knows what to delete
   log('Saving seed manifest...');
-  await setDoc(doc(db, MANIFEST_REF), {
+  await setDoc(doc(db, coll(MANIFEST_COL), MANIFEST_ID), {
     orgIds: manifest.orgIds,
     showIds: manifest.showIds,
     allPerformers: [...manifest.allPerformers],
@@ -284,7 +281,7 @@ export async function clearSeedData(onProgress) {
 
   // 1. Read the manifest
   log('Reading seed manifest...');
-  const manifestSnap = await getDoc(doc(db, MANIFEST_REF));
+  const manifestSnap = await getDoc(doc(db, coll(MANIFEST_COL), MANIFEST_ID));
 
   if (!manifestSnap.exists()) {
     throw new Error('No seed manifest found. Nothing to clear.');
@@ -292,14 +289,19 @@ export async function clearSeedData(onProgress) {
 
   const { orgIds, showIds, allPerformers } = manifestSnap.data();
   let deletedActs = 0;
+  const seededActKeys = [];
 
   // 2. Delete acts for each seeded show
   for (const showId of showIds) {
     log(`Deleting acts for show: ${showId}...`);
-    const actsSnap = await getDocs(query(collection(db, 'acts'), where('show_id', '==', showId)));
+    const actsSnap = await getDocs(query(collection(db, coll('acts')), where('show_id', '==', showId)));
     if (actsSnap.size > 0) {
       // Batch in chunks of 400
       const docs = actsSnap.docs;
+      docs.forEach(d => {
+        const n = d.data().number;
+        if (typeof n === 'number') seededActKeys.push(`act-${showId}-${n}`);
+      });
       for (let i = 0; i < docs.length; i += 400) {
         const batch = writeBatch(db);
         docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
@@ -312,32 +314,27 @@ export async function clearSeedData(onProgress) {
   // 3. Delete shows
   log(`Deleting ${showIds.length} shows...`);
   for (const showId of showIds) {
-    await deleteDoc(doc(db, 'shows', showId));
+    await deleteDoc(doc(db, coll('shows'), showId));
   }
 
   // 4. Delete show_status
   log('Deleting show statuses...');
   for (const showId of showIds) {
-    await deleteDoc(doc(db, 'show_status', showId));
+    await deleteDoc(doc(db, coll('show_status'), showId));
   }
 
   // 5. Delete organizations
   log(`Deleting ${orgIds.length} organizations...`);
   for (const orgId of orgIds) {
-    await deleteDoc(doc(db, 'organizations', orgId));
-    await deleteDoc(doc(db, 'test_organizations', orgId));
+    await deleteDoc(doc(db, coll('organizations'), orgId));
   }
 
   // 6. Scrub favorites from all user profiles
   log('Cleaning favorites from user profiles...');
-  const seededKeys = new Set(allPerformers || []);
-  // Also add act-N patterns (acts go up to 35 max)
-  for (let n = 1; n <= 50; n++) {
-    seededKeys.add(`act-${n}`);
-  }
+  const seededKeys = new Set([...(allPerformers || []), ...seededActKeys]);
 
   let usersUpdated = 0;
-  const usersSnap = await getDocs(collection(db, 'user_profiles'));
+  const usersSnap = await getDocs(collection(db, coll('user_profiles')));
   for (const userDoc of usersSnap.docs) {
     const data = userDoc.data();
     const favs = data.favorites;
@@ -352,7 +349,7 @@ export async function clearSeedData(onProgress) {
 
   // 7. Delete the manifest itself
   log('Removing seed manifest...');
-  await deleteDoc(doc(db, MANIFEST_REF));
+  await deleteDoc(doc(db, coll(MANIFEST_COL), MANIFEST_ID));
 
   log(`Done! Removed ${deletedActs} acts, ${showIds.length} shows, ${orgIds.length} studios, cleaned ${usersUpdated} user(s).`);
 

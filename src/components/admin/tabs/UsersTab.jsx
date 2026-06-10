@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useApp } from '../../../context/AppContext';
 import { RefreshCw } from 'lucide-react';
-import { db } from '../../../firebase';
+import { db, coll } from '../../../firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 
 export default function UsersTab({ showToast }) {
@@ -13,7 +13,7 @@ export default function UsersTab({ showToast }) {
     if (!isSuperAdmin) return;
     setLoadingUsers(true);
     try {
-      const snap = await getDocs(query(collection(db, 'user_profiles'), orderBy('last_login', 'desc')));
+      const snap = await getDocs(query(collection(db, coll('user_profiles')), orderBy('last_login', 'desc')));
       setAppUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch (e) { showToast(e.message, 'error'); }
     finally { setLoadingUsers(false); }

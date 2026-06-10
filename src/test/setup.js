@@ -8,6 +8,7 @@ vi.mock('../firebase', () => ({
   googleProvider: {},
   authorizedUsers: ['superadmin@test.com'],
   DB_PREFIX: '',
+  coll: (name) => name,
 }));
 
 vi.mock('firebase/auth', () => ({

@@ -78,6 +78,52 @@ describe('useLiveTracker', () => {
     });
   });
 
+  it('refetches acts when a show updated_at changes (stale-cache fix)', async () => {
+    const show = (updatedAt) => ({ id: 'show1', org_id: 'org1', label: 'Show', updated_at: updatedAt });
+    const v1 = [{ id: 'a1', show_id: 'show1', number: 1, title: 'Opening', performers: ['Alice', 'Bob'] }];
+    const v2 = [{ id: 'a1', show_id: 'show1', number: 1, title: 'Opening', performers: ['Alice'] }];
+
+    getDocs.mockResolvedValueOnce(makeSnap(v1)); // first acts fetch
+    getDocs.mockResolvedValue(makeSnap([]));       // status checks etc.
+
+    const { result } = renderHook(() => useLiveTracker('org1', null));
+
+    await act(async () => {
+      await onSnapshotCallback(makeSnap([show('t1')]));
+    });
+    expect(result.current.recitalData.show1.acts[0].performers).toEqual(['Alice', 'Bob']);
+
+    getDocs.mockResolvedValueOnce(makeSnap(v2)); // refetch after edit
+    getDocs.mockResolvedValue(makeSnap([]));
+    await act(async () => {
+      await onSnapshotCallback(makeSnap([show('t2')]));
+    });
+    expect(result.current.recitalData.show1.acts[0].performers).toEqual(['Alice']);
+  });
+
+  it('serves cached acts when updated_at is unchanged (no refetch)', async () => {
+    const show = { id: 'show1', org_id: 'org1', label: 'Show', updated_at: 't1' };
+    getDocs.mockResolvedValueOnce(makeSnap([
+      { id: 'a1', show_id: 'show1', number: 1, title: 'Opening', performers: ['Alice'] },
+    ]));
+    getDocs.mockResolvedValue(makeSnap([]));
+
+    const { result } = renderHook(() => useLiveTracker('org1', null));
+    await act(async () => {
+      await onSnapshotCallback(makeSnap([show]));
+    });
+    expect(result.current.recitalData.show1.acts[0].title).toBe('Opening');
+
+    // If the cache were ignored this stale data would replace 'Opening'.
+    getDocs.mockResolvedValue(makeSnap([
+      { id: 'a1', show_id: 'show1', number: 1, title: 'CHANGED', performers: ['Zoe'] },
+    ]));
+    await act(async () => {
+      await onSnapshotCallback(makeSnap([show]));
+    });
+    expect(result.current.recitalData.show1.acts[0].title).toBe('Opening');
+  });
+
   it('defaults performers to empty array when field is missing from Firestore doc', async () => {
     const shows = [{ id: 'show1', org_id: 'org1', label: 'Show' }];
     const acts = [{ id: 'a1', show_id: 'show1', number: 1, title: 'Solo' }]; // no performers key

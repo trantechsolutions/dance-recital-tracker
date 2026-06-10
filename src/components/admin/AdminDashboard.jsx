@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AlertCircle, Check, Calendar, User as UserIcon, Sparkles } from 'lucide-react';
 import { clsx } from 'clsx';
-import { db } from '../../firebase';
+import { db, coll } from '../../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import ConfirmModal from '../ui/ConfirmModal';
 import PromptModal from '../ui/PromptModal';
@@ -32,7 +32,7 @@ export default function AdminDashboard({
   useEffect(() => {
     const fetchOrg = async () => {
       if (!orgId) return;
-      const snap = await getDoc(doc(db, 'organizations', orgId));
+      const snap = await getDoc(doc(db, coll('organizations'), orgId));
       if (snap.exists()) setOrgData(snap.data());
     };
     fetchOrg();
