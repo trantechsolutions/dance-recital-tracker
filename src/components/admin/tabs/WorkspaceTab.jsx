@@ -24,6 +24,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { db, coll } from '../../../firebase';
 import { collection, getDocs } from 'firebase/firestore';
+import { MULTI_STUDIO_ENABLED } from '../../../config';
 
 function formatShowDate(id) {
   try {
@@ -69,6 +70,18 @@ function StudioContextBar({ allOrgs, loadingOrgs, fetchAllOrgs, onCreateOrg, sho
   const selectedOrg = allOrgs.find(o => o.id === orgId);
   const displayName = orgName || selectedOrg?.name || orgId || 'Select Studio';
 
+  // Single-studio mode with a resolved org: static identity pill, no switching
+  // or creating. The interactive picker still renders when no org exists so a
+  // super admin can bootstrap the first studio.
+  if (!MULTI_STUDIO_ENABLED && orgId) {
+    return (
+      <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-card border-2 border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-800 text-ink-700 dark:text-white font-bold text-sm">
+        <Building2 size={15} className="text-brand-500" />
+        <span className="max-w-[180px] truncate">{displayName}</span>
+      </div>
+    );
+  }
+
   const handleCreate = async () => {
     if (!form.id || !form.name) return showToast('ID and Name required', 'error');
     try {
@@ -108,7 +121,7 @@ function StudioContextBar({ allOrgs, loadingOrgs, fetchAllOrgs, onCreateOrg, sho
 
       {/* Dropdown Panel */}
       {open && (
-        <div className="absolute top-full left-0 mt-2 w-80 bg-white dark:bg-ink-800 rounded-card border border-ink-200 dark:border-ink-700 shadow-xl z-30 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute top-full left-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white dark:bg-ink-800 rounded-card border border-ink-200 dark:border-ink-700 shadow-xl z-30 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
           <div className="p-3 border-b border-ink-100 dark:border-ink-700 flex items-center justify-between">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-400">Switch Studio</span>
             <button
@@ -310,7 +323,8 @@ function ManageStudioAccordion({ orgData, setOrgData, showToast, setPromptModal,
             </div>
           </div>
 
-          {/* Danger Zone */}
+          {/* Danger Zone — multi-studio only: deleting the sole tenant would brick the app */}
+          {MULTI_STUDIO_ENABLED && (
           <div className="p-4 rounded-card border-2 border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-900/10">
             <div className="flex items-start gap-3">
               <div className="p-2 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-card shrink-0">
@@ -358,6 +372,7 @@ function ManageStudioAccordion({ orgData, setOrgData, showToast, setPromptModal,
               </div>
             </div>
           </div>
+          )}
         </div>
       )}
     </div>
@@ -403,7 +418,12 @@ export default function WorkspaceTab({
     finally { setLoadingOrgs(false); }
   }, [showToast]);
 
-  useEffect(() => { fetchAllOrgs(); }, [fetchAllOrgs]);
+  useEffect(() => {
+    // Single-studio mode with a resolved org renders a static pill — the org
+    // list is only needed for the interactive picker.
+    if (!MULTI_STUDIO_ENABLED && orgId) return;
+    fetchAllOrgs();
+  }, [fetchAllOrgs, orgId]);
 
   const showList = recitalData ? Object.entries(recitalData).map(([id, data]) => ({ id, ...data })) : [];
 

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
-import { getDoc, setDoc } from 'firebase/firestore';
+import { getDoc, getDocs, setDoc } from 'firebase/firestore';
 import { AppProvider, useApp } from '../context/AppContext';
 
 // Test consumer to expose context values
@@ -306,5 +306,78 @@ describe('AppContext.toggleFavorite', () => {
     });
 
     expect(captured.favorites.has('')).toBe(true);
+  });
+});
+
+// Single-studio mode is the default in tests (no VITE_MULTI_STUDIO set),
+// so the org auto-resolution chain of ADR-002 is exercised directly.
+describe('AppContext single-studio org resolution', () => {
+  let authCallback;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    onAuthStateChanged.mockImplementation((auth, cb) => {
+      authCallback = cb;
+      return vi.fn();
+    });
+    getDoc.mockResolvedValue({ exists: () => false, data: () => ({}) });
+    setDoc.mockResolvedValue(undefined);
+  });
+
+  it('auto-resolves to the first organization sorted by id', async () => {
+    getDocs.mockResolvedValue({
+      empty: false,
+      docs: [{ id: 'zeta-dance' }, { id: 'alpha-studio' }],
+    });
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => { authCallback(null); });
+
+    await waitFor(() => expect(captured.orgId).toBe('alpha-studio'));
+    expect(captured.orgResolveAttempted).toBe(true);
+  });
+
+  it('marks resolution attempted with no org when the collection is empty', async () => {
+    getDocs.mockResolvedValue({ empty: true, docs: [] });
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => { authCallback(null); });
+
+    await waitFor(() => expect(captured.orgResolveAttempted).toBe(true));
+    expect(captured.orgId).toBeNull();
+  });
+
+  it('prefers a stored localStorage org and skips the organizations fetch', async () => {
+    localStorage.setItem('selectedOrgId', 'stored-studio');
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => { authCallback(null); });
+
+    expect(captured.orgId).toBe('stored-studio');
+    expect(getDocs).not.toHaveBeenCalled();
+  });
+
+  it('re-resolves after the org is cleared (e.g. dev-tools teardown)', async () => {
+    getDocs.mockResolvedValue({
+      empty: false,
+      docs: [{ id: 'only-studio' }],
+    });
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => { authCallback(null); });
+    await waitFor(() => expect(captured.orgId).toBe('only-studio'));
+
+    await act(async () => { captured.setOrgId(null); });
+
+    await waitFor(() => expect(captured.orgId).toBe('only-studio'));
   });
 });

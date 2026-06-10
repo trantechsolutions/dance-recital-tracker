@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { auth, db, authorizedUsers, coll } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { MULTI_STUDIO_ENABLED, DEFAULT_ORG_ID } from '../config';
 
 const AppContext = createContext();
 
@@ -16,7 +17,15 @@ export function AppProvider({ children }) {
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [hasSkippedLogin, setHasSkippedLogin] = useState(() => localStorage.getItem('hasSkippedLogin') === 'true');
   const [favorites, setFavorites] = useState(new Set());
-  const [orgId, setOrgId] = useState(() => localStorage.getItem('selectedOrgId') || null);
+  const [orgId, setOrgId] = useState(() => {
+    // Single-studio mode: a configured default org is authoritative (overrides
+    // any stale localStorage value from a prior multi-studio session).
+    if (!MULTI_STUDIO_ENABLED && DEFAULT_ORG_ID) return DEFAULT_ORG_ID;
+    return localStorage.getItem('selectedOrgId') || null;
+  });
+  // True once single-studio org resolution has finished (success or empty result),
+  // so the UI can distinguish "resolving" from "no studio configured".
+  const [orgResolveAttempted, setOrgResolveAttempted] = useState(MULTI_STUDIO_ENABLED);
   const [orgName, setOrgName] = useState('');
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
 
@@ -92,6 +101,34 @@ export function AppProvider({ children }) {
     }
   }, [orgId]);
 
+  // --- Single-Studio Org Auto-Resolution (ADR-002) ---
+  // Precedence: DEFAULT_ORG_ID → localStorage (handled in initial state) →
+  // first organizations doc sorted by id → unconfigured (orgResolveAttempted=true).
+  useEffect(() => {
+    if (MULTI_STUDIO_ENABLED || orgId) return;
+    if (DEFAULT_ORG_ID) {
+      setOrgId(DEFAULT_ORG_ID);
+      setOrgResolveAttempted(true);
+      return;
+    }
+    let cancelled = false;
+    const resolveOrg = async () => {
+      try {
+        const snap = await getDocs(collection(db, coll('organizations')));
+        if (!cancelled && !snap.empty) {
+          const first = [...snap.docs].sort((a, b) => a.id.localeCompare(b.id))[0];
+          setOrgId(first.id);
+        }
+      } catch (err) {
+        console.error('[Org] Auto-resolve failed:', err);
+      } finally {
+        if (!cancelled) setOrgResolveAttempted(true);
+      }
+    };
+    resolveOrg();
+    return () => { cancelled = true; };
+  }, [orgId]);
+
   // --- Org Name + Studio Admin Check ---
   useEffect(() => {
     if (!orgId) return;
@@ -150,7 +187,7 @@ export function AppProvider({ children }) {
     user, isAuthorized, isSuperAdmin, isStudioAdmin, isAuthChecking,
     hasSkippedLogin, skipLogin, clearSkipLogin,
     favorites, toggleFavorite,
-    orgId, setOrgId, orgName,
+    orgId, setOrgId, orgName, orgResolveAttempted,
     loginPromptOpen, setLoginPromptOpen,
   };
 

@@ -8,6 +8,7 @@ import { clsx } from 'clsx';
 import ConfirmModal from './ui/ConfirmModal';
 import { getAuthErrorMessage } from '../utils/authErrors';
 import { Link } from 'react-router-dom';
+import { MULTI_STUDIO_ENABLED } from '../config';
 
 export default function SettingsView() {
   const { user, setOrgId, clearSkipLogin, isAuthorized } = useApp();
@@ -100,7 +101,8 @@ export default function SettingsView() {
         </Link>
       )}
 
-      {/* Organization Section */}
+      {/* Organization Section — multi-studio only */}
+      {MULTI_STUDIO_ENABLED && (
       <section className="bg-white dark:bg-ink-800 p-4 sm:p-6 rounded-card sm:rounded-card border border-ink-200 dark:border-ink-700 shadow-sm">
         <h3 className="text-[10px] font-semibold uppercase text-ink-400 mb-4 tracking-widest">Organization</h3>
         <button
@@ -120,6 +122,7 @@ export default function SettingsView() {
           <ChevronRight size={18} className="text-ink-400" />
         </button>
       </section>
+      )}
 
       {/* Account Section */}
       <section className="bg-white dark:bg-ink-800 p-4 sm:p-6 rounded-card sm:rounded-card border border-ink-200 dark:border-ink-700 shadow-sm">

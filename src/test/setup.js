@@ -23,7 +23,10 @@ vi.mock('firebase/firestore', () => ({
   query: vi.fn(() => ({ type: 'query' })),
   where: vi.fn(),
   orderBy: vi.fn(),
-  getDocs: vi.fn(),
+  // Default resolved value keeps AppContext's single-studio org auto-resolution
+  // harmless in tests that don't care about it; per-test mockResolvedValue(Once)
+  // overrides still take precedence.
+  getDocs: vi.fn(() => Promise.resolve({ empty: true, docs: [] })),
   getDoc: vi.fn(),
   setDoc: vi.fn(),
   doc: vi.fn(() => ({ type: 'docRef' })),

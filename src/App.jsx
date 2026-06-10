@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useApp } from './context/AppContext';
 import { useLiveTracker } from './hooks/useLiveTracker';
+import { MULTI_STUDIO_ENABLED } from './config';
 
 // Icons
 import {
@@ -46,7 +47,7 @@ export default function App() {
   const {
     user, isAuthorized, isSuperAdmin, isAuthChecking,
     hasSkippedLogin, skipLogin, favorites, toggleFavorite,
-    orgId, setOrgId, orgName,
+    orgId, setOrgId, orgName, orgResolveAttempted,
     loginPromptOpen, setLoginPromptOpen,
   } = useApp();
 
@@ -59,10 +60,11 @@ export default function App() {
     setRecitalData, invalidateActsCache, updateActNumber, toggleTracking
   } = useLiveTracker(orgId, selectedShow);
 
-  // 4. Handle deep-linked Organization (only on initial load)
+  // 4. Handle deep-linked Organization (only on initial load).
+  // Single-studio mode ignores ?org= — the tenant is resolved by AppContext.
   const deepLinkApplied = useRef(false);
   useEffect(() => {
-    if (deepLinkApplied.current) return;
+    if (!MULTI_STUDIO_ENABLED || deepLinkApplied.current) return;
     deepLinkApplied.current = true;
     const urlOrg = searchParams.get('org');
     if (urlOrg && urlOrg !== orgId) {
@@ -122,6 +124,10 @@ export default function App() {
   if (!user && !hasSkippedLogin) return <LoginScreen onSkip={skipLogin} />;
 
   if (!orgId && !location.pathname.startsWith('/settings') && !(isSuperAdmin && location.pathname.startsWith('/admin'))) {
+    // Single-studio mode: the org resolves automatically (ADR-002) — show a
+    // spinner while resolving, then an explicit unconfigured state. The studio
+    // picker only renders in multi-studio mode.
+    if (!MULTI_STUDIO_ENABLED && !orgResolveAttempted) return <LoadingScreen text="Loading" />;
     return (
       <div className="relative min-h-screen">
         {isSuperAdmin && (
@@ -135,10 +141,22 @@ export default function App() {
             </button>
           </div>
         )}
-        <StudioSelector onSelect={(id) => {
-          setOrgId(id);
-          navigate(`/?org=${id}`);
-        }} />
+        {MULTI_STUDIO_ENABLED ? (
+          <StudioSelector onSelect={(id) => {
+            setOrgId(id);
+            navigate(`/?org=${id}`);
+          }} />
+        ) : (
+          <div className="min-h-screen bg-ink-50 dark:bg-ink-900 flex flex-col items-center justify-center p-6 text-center transition-colors duration-300">
+            <div className="w-20 h-20 bg-brand-100 dark:bg-brand-900/30 text-brand-600 rounded-full flex items-center justify-center mb-6 shadow-inner">
+              <Building2 size={40} />
+            </div>
+            <h1 className="text-3xl font-semibold text-ink-900 dark:text-white tracking-tight mb-2">No studio configured</h1>
+            <p className="text-ink-500 dark:text-ink-400 font-medium max-w-sm">
+              The recital program isn't set up yet. Please check back soon.
+            </p>
+          </div>
+        )}
       </div>
     );
   }
@@ -169,7 +187,7 @@ export default function App() {
           <p className="text-ink-400 text-[11px] font-medium uppercase tracking-marquee mt-1.5">Recital Program</p>
         </div>
 
-        {orgId && (
+        {MULTI_STUDIO_ENABLED && orgId && (
           <button
             onClick={handleSwitchStudio}
             className="mb-5 mx-1 flex items-center gap-2 text-xs font-semibold text-ink-500 hover:text-brand-700 dark:hover:text-brand-400 transition-colors bg-ink-50 dark:bg-ink-800 hover:bg-brand-50 dark:hover:bg-brand-950/40 px-4 py-2.5 rounded-card border border-ink-100 dark:border-ink-700"
@@ -227,7 +245,7 @@ export default function App() {
                   <User size={16} />
                 </div>
               )}
-              {orgId && (
+              {MULTI_STUDIO_ENABLED && orgId && (
                 <button
                   onClick={handleSwitchStudio}
                   aria-label="Switch Studio"
