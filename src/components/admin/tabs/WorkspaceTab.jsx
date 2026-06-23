@@ -11,7 +11,7 @@ import Papa from 'papaparse';
 import PerformerEditor from '../PerformerEditor';
 import {
   saveShow, createShow, uploadActsForShow, bulkImportShows,
-  createOrg, updateOrgAdmins, deleteStudio, deleteShow,
+  createOrg, updateOrgAdmins, updateOrgName, deleteStudio, deleteShow,
 } from '../../../services/showService';
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor,
@@ -215,13 +215,29 @@ function StudioContextBar({ allOrgs, loadingOrgs, fetchAllOrgs, onCreateOrg, sho
 // â”€â”€â”€ Manage Studio Accordion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ManageStudioAccordion({ orgData, setOrgData, showToast, setPromptModal, setSelectedShow, fetchAllOrgs }) {
-  const { orgId, setOrgId } = useApp();
+  const { orgId, setOrgId, setOrgName } = useApp();
   const [expanded, setExpanded] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteLog, setDeleteLog] = useState([]);
 
+  // Keep the rename draft in sync when the org doc (re)loads
+  useEffect(() => { setNameDraft(orgData.name || ''); }, [orgData.name]);
+
   if (!orgId) return null;
+
+  const handleRenameStudio = async () => {
+    const name = nameDraft.trim();
+    if (!name) return showToast('Studio name cannot be empty', 'error');
+    if (name === (orgData.name || '')) return;
+    try {
+      await updateOrgName(orgId, name);
+      setOrgData({ ...orgData, name });
+      if (setOrgName) setOrgName(name); // sidebar/header pick up the new name immediately
+      showToast('Studio renamed', 'success');
+    } catch (e) { showToast(e.message, 'error'); }
+  };
 
   const handleUpdateAdmins = async (newAdmins) => {
     try {
@@ -271,6 +287,36 @@ function ManageStudioAccordion({ orgData, setOrgData, showToast, setPromptModal,
 
       {expanded && (
         <div className="border-t border-ink-100 dark:border-ink-700 p-5 space-y-5 animate-in fade-in duration-200">
+          {/* Studio Name Section */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Building2 size={13} className="text-ink-400" />
+              <label className="text-[10px] font-semibold uppercase text-ink-400 tracking-widest">
+                Studio Name
+              </label>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Studio name..."
+                className="flex-1 min-w-0 bg-ink-50 dark:bg-ink-900 p-3 rounded-card dark:text-white border border-ink-200 dark:border-ink-700 outline-none focus:border-brand-500 text-sm font-bold"
+                value={nameDraft}
+                onChange={e => setNameDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleRenameStudio(); }}
+              />
+              <button
+                onClick={handleRenameStudio}
+                disabled={!nameDraft.trim() || nameDraft.trim() === (orgData.name || '')}
+                className="bg-brand-600 text-white px-5 rounded-card font-bold text-sm hover:bg-brand-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Save
+              </button>
+            </div>
+            <p className="text-[10px] text-ink-400 mt-1.5">
+              Display name only — the studio id <span className="font-mono">{orgId}</span> stays unchanged.
+            </p>
+          </div>
+
           {/* Admins Section */}
           <div>
             <div className="flex items-center gap-2 mb-3">
@@ -429,14 +475,16 @@ export default function WorkspaceTab({
 
   const handleSave = async () => {
     if (!editData) return;
+    const label = (editData.label || '').trim();
+    if (!label) return showToast('Show title cannot be empty', 'error');
     try {
       const cleanedActs = editData.acts.map(act => ({
         ...act,
         performers: act.performers.map(p => p.trim()).filter(p => p !== '')
       }));
-      await saveShow(orgId, editData.id, editData.label, cleanedActs);
+      await saveShow(orgId, editData.id, label, cleanedActs);
       invalidateActsCache(editData.id);
-      setRecitalData(prev => ({ ...prev, [editData.id]: { ...editData, acts: cleanedActs } }));
+      setRecitalData(prev => ({ ...prev, [editData.id]: { ...editData, label, acts: cleanedActs } }));
       showToast('Changes saved', 'success');
     } catch (err) { showToast(err.message, 'error'); }
   };
@@ -747,7 +795,8 @@ export default function WorkspaceTab({
                             <span className="flex items-center gap-1"><Users size={12} /> {new Set(show.acts?.flatMap(a => a.performers || [])).size} dancers</span>
                           </div>
                         </div>
-                        <div className={clsx("p-2 rounded-xl transition-colors shrink-0", isSelected ? "bg-pink-600 text-white" : "bg-slate-50 dark:bg-slate-900 text-slate-300 group-hover:text-pink-500")}>
+                        {/* mr-10 reserves the top-right slot for the absolutely-positioned delete button */}
+                        <div className={clsx("p-2 rounded-xl transition-colors shrink-0 mr-10", isSelected ? "bg-pink-600 text-white" : "bg-slate-50 dark:bg-slate-900 text-slate-300 group-hover:text-pink-500")}>
                           <Pencil size={16} />
                         </div>
                       </div>
@@ -757,7 +806,7 @@ export default function WorkspaceTab({
                       disabled={isDeleting}
                       title="Delete show"
                       aria-label={`Delete ${show.label}`}
-                      className="absolute bottom-3 right-3 p-2 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors z-10 disabled:opacity-50 disabled:cursor-wait"
+                      className="absolute top-5 right-5 p-2 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors z-10 disabled:opacity-50 disabled:cursor-wait"
                     >
                       {isDeleting
                         ? <RefreshCw size={16} className="animate-spin" />
@@ -863,10 +912,17 @@ export default function WorkspaceTab({
           {editData && (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-ink-800 p-4 rounded-card border border-ink-100 dark:border-ink-700 sticky top-0 z-20 shadow-sm">
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="w-10 h-10 bg-brand-100 dark:bg-brand-900/30 text-brand-600 rounded-card flex items-center justify-center shrink-0"><Calendar size={18} /></div>
-                  <div className="min-w-0">
-                    <h3 className="font-semibold dark:text-white truncate text-sm">{editData.label}</h3>
+                  <div className="min-w-0 flex-1">
+                    <input
+                      type="text"
+                      value={editData.label}
+                      onChange={e => setEditData({ ...editData, label: e.target.value })}
+                      aria-label="Show title"
+                      placeholder="Show title"
+                      className="w-full max-w-md bg-transparent font-semibold dark:text-white text-sm outline-none border-b border-transparent hover:border-ink-200 dark:hover:border-ink-600 focus:border-brand-500 transition-colors"
+                    />
                     <p className="text-[10px] font-bold text-ink-400">{editData.acts.length} acts</p>
                   </div>
                 </div>

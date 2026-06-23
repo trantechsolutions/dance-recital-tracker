@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { db, coll } from '../firebase';
 import {
-  collection, query, where, getDocs, doc, setDoc, onSnapshot, orderBy
+  collection, query, where, getDocs, doc, setDoc, onSnapshot
 } from 'firebase/firestore';
 
 export function useLiveTracker(orgId, selectedShowId) {
@@ -47,12 +47,14 @@ export function useLiveTracker(orgId, selectedShowId) {
           return !cached || cached.updatedAt !== (s.updated_at ?? null);
         });
         if (uncached.length > 0) {
+          // No orderBy here: where + orderBy needs a composite index per
+          // collection (acts AND test_acts). Acts per show are few — sort
+          // client-side instead so dev/test collections never need indexes.
           const fetched = await Promise.all(
             uncached.map(show =>
               getDocs(query(
                 collection(db, coll('acts')),
-                where('show_id', '==', show.id),
-                orderBy('number', 'asc')
+                where('show_id', '==', show.id)
               ))
             )
           );
@@ -63,7 +65,7 @@ export function useLiveTracker(orgId, selectedShowId) {
                 number: d.data().number,
                 title: d.data().title,
                 performers: d.data().performers || []
-              }))
+              })).sort((a, b) => (a.number ?? 0) - (b.number ?? 0))
             };
           });
         }

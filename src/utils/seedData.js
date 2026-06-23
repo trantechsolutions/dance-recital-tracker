@@ -212,6 +212,7 @@ export async function seedDatabase(onProgress) {
     await setDoc(doc(db, coll('organizations'), studio.orgId), {
       name: studio.name,
       admins: studio.admins,
+      slug: studio.orgId,
     });
 
     for (const show of studio.shows) {

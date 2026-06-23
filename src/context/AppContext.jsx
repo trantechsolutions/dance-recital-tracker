@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { auth, db, authorizedUsers, coll } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
@@ -26,6 +26,9 @@ export function AppProvider({ children }) {
   // True once single-studio org resolution has finished (success or empty result),
   // so the UI can distinguish "resolving" from "no studio configured".
   const [orgResolveAttempted, setOrgResolveAttempted] = useState(MULTI_STUDIO_ENABLED);
+  // Set when DEFAULT_ORG_ID points at a nonexistent org doc, so resolution
+  // falls through to the first real org instead of re-pinning a bad config.
+  const invalidDefaultOrg = useRef(false);
   const [orgName, setOrgName] = useState('');
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
 
@@ -106,7 +109,7 @@ export function AppProvider({ children }) {
   // first organizations doc sorted by id → unconfigured (orgResolveAttempted=true).
   useEffect(() => {
     if (MULTI_STUDIO_ENABLED || orgId) return;
-    if (DEFAULT_ORG_ID) {
+    if (DEFAULT_ORG_ID && !invalidDefaultOrg.current) {
       setOrgId(DEFAULT_ORG_ID);
       setOrgResolveAttempted(true);
       return;
@@ -135,7 +138,20 @@ export function AppProvider({ children }) {
     const fetchOrg = async () => {
       try {
         const snap = await getDoc(doc(db, coll('organizations'), orgId));
-        if (!snap.exists()) return;
+        if (!snap.exists()) {
+          // orgId points at a nonexistent org (stale localStorage, bad deep
+          // link, or misconfigured VITE_DEFAULT_ORG_ID). Clear it so admin
+          // writes can't land under a phantom studio; resolution recovers
+          // with a real org on the next pass.
+          console.warn(`[Org] No organization doc for "${orgId}" — clearing selection`);
+          if (DEFAULT_ORG_ID && orgId === DEFAULT_ORG_ID) {
+            invalidDefaultOrg.current = true;
+            console.error(`[Org] VITE_DEFAULT_ORG_ID="${DEFAULT_ORG_ID}" has no doc in "${coll('organizations')}" — falling back to auto-resolution`);
+          }
+          setOrgId(null);
+          setOrgResolveAttempted(false);
+          return;
+        }
         const data = snap.data();
         setOrgName(data.name || '');
         const studioAdmin = !!(user && data.admins?.includes(user.email));
@@ -187,7 +203,7 @@ export function AppProvider({ children }) {
     user, isAuthorized, isSuperAdmin, isStudioAdmin, isAuthChecking,
     hasSkippedLogin, skipLogin, clearSkipLogin,
     favorites, toggleFavorite,
-    orgId, setOrgId, orgName, orgResolveAttempted,
+    orgId, setOrgId, orgName, setOrgName, orgResolveAttempted,
     loginPromptOpen, setLoginPromptOpen,
   };
 

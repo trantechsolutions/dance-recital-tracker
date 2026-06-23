@@ -219,11 +219,61 @@ export async function deleteShow(orgId, showId, onProgress = () => {}) {
 // ── Organizations ────────────────────────────────────────────────────
 
 export async function createOrg(formattedId, name, admins) {
-  await setDoc(doc(db, coll('organizations'), formattedId), { name, admins });
+  // slug mirrors the doc id so the identifier is readable in queries/exports
+  await setDoc(doc(db, coll('organizations'), formattedId), { name, admins, slug: formattedId });
 }
 
 export async function updateOrgAdmins(orgId, newAdmins) {
   await setDoc(doc(db, coll('organizations'), orgId), { admins: newAdmins }, { merge: true });
+}
+
+/**
+ * Rename a studio's display name. The document id is intentionally never
+ * changed — it's referenced by shows.org_id, share links, and localStorage.
+ * The slug field is (re)written alongside as a backfill for org docs created
+ * before slugs were stored.
+ */
+export async function updateOrgName(orgId, name) {
+  await setDoc(doc(db, coll('organizations'), orgId), { name, slug: orgId }, { merge: true });
+}
+
+/**
+ * Find shows whose org_id doesn't match any existing organization doc —
+ * the result of an org being deleted and recreated under a different id
+ * (e.g. "dancer-s-pointe" → "dancers-pointe"). Returns a map of
+ * { orphanOrgId: [{ id, label }, ...] }.
+ */
+export async function findOrphanedShows() {
+  const [orgsSnap, showsSnap] = await Promise.all([
+    getDocs(collection(db, coll('organizations'))),
+    getDocs(collection(db, coll('shows'))),
+  ]);
+  const orgIds = new Set(orgsSnap.docs.map(d => d.id));
+  const orphans = {};
+  showsSnap.docs.forEach(d => {
+    const data = d.data();
+    if (data.org_id && orgIds.has(data.org_id)) return;
+    const key = data.org_id || '(no org_id)';
+    if (!orphans[key]) orphans[key] = [];
+    orphans[key].push({ id: d.id, label: data.label || d.id });
+  });
+  return orphans;
+}
+
+/**
+ * Re-point shows (and their show_status docs) to another organization.
+ * Acts and favorites are keyed by show_id, so they follow automatically.
+ */
+export async function relinkShows(showIds, toOrgId) {
+  // 250 shows × 2 writes stays within Firestore's 500-op batch limit
+  for (let i = 0; i < showIds.length; i += 250) {
+    const batch = writeBatch(db);
+    showIds.slice(i, i + 250).forEach(id => {
+      batch.set(doc(db, coll('shows'), id), { org_id: toOrgId, updated_at: new Date().toISOString() }, { merge: true });
+      batch.set(doc(db, coll('show_status'), id), { show_id: id, org_id: toOrgId }, { merge: true });
+    });
+    await batch.commit();
+  }
 }
 
 /**

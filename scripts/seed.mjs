@@ -47,6 +47,7 @@ const ORG_ID = 'dancers-pointe';
 const organization = {
   name: "Dancer's Pointe",
   admins: [env.VITE_AUTHORIZED_ADMINS || 'jonny5v@gmail.com'],
+  slug: ORG_ID,
 };
 
 // Two shows

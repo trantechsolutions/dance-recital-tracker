@@ -321,7 +321,8 @@ describe('AppContext single-studio org resolution', () => {
       authCallback = cb;
       return vi.fn();
     });
-    getDoc.mockResolvedValue({ exists: () => false, data: () => ({}) });
+    // Resolved orgs must have a backing doc, or the phantom-org guard clears them
+    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ name: 'Test Studio', admins: [] }) });
     setDoc.mockResolvedValue(undefined);
   });
 
@@ -362,6 +363,20 @@ describe('AppContext single-studio org resolution', () => {
 
     expect(captured.orgId).toBe('stored-studio');
     expect(getDocs).not.toHaveBeenCalled();
+  });
+
+  it('clears a stored orgId whose org doc no longer exists and recovers via auto-resolve', async () => {
+    localStorage.setItem('selectedOrgId', 'ghost-studio');
+    // 1st getDoc: ghost-studio missing → guard clears; later fetches exist
+    getDoc.mockResolvedValueOnce({ exists: () => false, data: () => ({}) });
+    getDocs.mockResolvedValue({ empty: false, docs: [{ id: 'real-studio' }] });
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => { authCallback(null); });
+
+    await waitFor(() => expect(captured.orgId).toBe('real-studio'));
   });
 
   it('re-resolves after the org is cleared (e.g. dev-tools teardown)', async () => {

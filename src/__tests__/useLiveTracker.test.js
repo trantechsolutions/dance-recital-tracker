@@ -78,6 +78,26 @@ describe('useLiveTracker', () => {
     });
   });
 
+  it('sorts acts by number client-side (no orderBy index required)', async () => {
+    const shows = [{ id: 'show1', org_id: 'org1', label: 'Saturday Show' }];
+    // Firestore returns acts unordered now that the query has no orderBy
+    const acts = [
+      { id: 'a3', show_id: 'show1', number: 3, title: 'Finale', performers: [] },
+      { id: 'a1', show_id: 'show1', number: 1, title: 'Opening', performers: [] },
+      { id: 'a2', show_id: 'show1', number: 2, title: 'Jazz', performers: [] },
+    ];
+
+    getDocs.mockResolvedValue(makeSnap(acts));
+
+    const { result } = renderHook(() => useLiveTracker('org1', 'show1'));
+
+    await act(async () => {
+      await onSnapshotCallback(makeSnap(shows));
+    });
+
+    expect(result.current.recitalData.show1.acts.map(a => a.number)).toEqual([1, 2, 3]);
+  });
+
   it('refetches acts when a show updated_at changes (stale-cache fix)', async () => {
     const show = (updatedAt) => ({ id: 'show1', org_id: 'org1', label: 'Show', updated_at: updatedAt });
     const v1 = [{ id: 'a1', show_id: 'show1', number: 1, title: 'Opening', performers: ['Alice', 'Bob'] }];

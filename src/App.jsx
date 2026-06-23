@@ -7,7 +7,7 @@ import { MULTI_STUDIO_ENABLED } from './config';
 // Icons
 import {
   List, Search, Settings, ShieldAlert,
-  Building2, LogOut, User, Heart
+  Building2, LogOut, LogIn, User, Heart
 } from 'lucide-react';
 
 // Components
@@ -21,7 +21,6 @@ import NavButton from './components/ui/NavButton';
 import SidebarLink from './components/ui/SidebarLink';
 import LiveTrackerHero from './components/program/LiveTrackerHero';
 import StudioSelector from './components/StudioSelector';
-import LoginScreen from './components/LoginScreen';
 import ShowSelector from './components/ui/ShowSelector';
 import FloatingButtons from './components/ui/FloatingButtons';
 import LoginPromptModal from './components/ui/LoginPromptModal';
@@ -46,7 +45,7 @@ export default function App() {
   // 1. Hook into Context
   const {
     user, isAuthorized, isSuperAdmin, isAuthChecking,
-    hasSkippedLogin, skipLogin, favorites, toggleFavorite,
+    favorites, toggleFavorite,
     orgId, setOrgId, orgName, orgResolveAttempted,
     loginPromptOpen, setLoginPromptOpen,
   } = useApp();
@@ -121,7 +120,9 @@ export default function App() {
 
   if (isAuthChecking) return <LoadingScreen text="Loading" />;
 
-  if (!user && !hasSkippedLogin) return <LoginScreen onSkip={skipLogin} />;
+  // No login gate — the app opens straight into the program. Signing in is
+  // optional (favorites sync) and lives in Settings, reachable from the
+  // sign-in placeholders in the sidebar / mobile header.
 
   if (!orgId && !location.pathname.startsWith('/settings') && !(isSuperAdmin && location.pathname.startsWith('/admin'))) {
     // Single-studio mode: the org resolves automatically (ADR-002) — show a
@@ -208,7 +209,7 @@ export default function App() {
           )}
           <SidebarLink to="/settings" active={location.pathname === '/settings'} icon={<Settings size={18}/>} label="Settings" />
 
-          {user && (
+          {user ? (
             <div className="mt-4 mx-1 p-3 bg-ink-50 dark:bg-ink-800 rounded-card flex items-center gap-3 border border-ink-100 dark:border-ink-700">
               <div className="w-9 h-9 bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 rounded-full flex items-center justify-center shrink-0">
                 <User size={16} />
@@ -218,6 +219,19 @@ export default function App() {
                 <p className="text-[11px] font-medium text-ink-500 dark:text-ink-400 mt-0.5">Signed in</p>
               </div>
             </div>
+          ) : (
+            <Link
+              to="/settings"
+              className="mt-4 mx-1 p-3 bg-ink-50 dark:bg-ink-800 rounded-card flex items-center gap-3 border border-ink-100 dark:border-ink-700 hover:border-brand-300 dark:hover:border-brand-700 transition-colors group"
+            >
+              <div className="w-9 h-9 bg-ink-100 dark:bg-ink-700 text-ink-400 group-hover:text-brand-600 dark:group-hover:text-brand-400 rounded-full flex items-center justify-center shrink-0 transition-colors">
+                <LogIn size={16} />
+              </div>
+              <div className="overflow-hidden flex-1 min-w-0">
+                <p className="text-sm font-semibold dark:text-white">Sign In</p>
+                <p className="text-[11px] font-medium text-ink-500 dark:text-ink-400 mt-0.5">Sync your favorites</p>
+              </div>
+            </Link>
           )}
         </div>
       </nav>
@@ -236,7 +250,7 @@ export default function App() {
               <p className="text-[11px] font-medium uppercase tracking-marquee text-ink-400 mt-0.5">Recital Program</p>
             </div>
             <div className="flex items-center gap-2 shrink-0 ml-3">
-              {user && (
+              {user ? (
                 <div
                   className="w-11 h-11 bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 rounded-full flex items-center justify-center"
                   title={user.email}
@@ -244,6 +258,15 @@ export default function App() {
                 >
                   <User size={16} />
                 </div>
+              ) : (
+                <button
+                  onClick={() => navigate('/settings')}
+                  aria-label="Sign in"
+                  title="Sign in"
+                  className="w-11 h-11 bg-ink-100 dark:bg-ink-800 rounded-full text-ink-500 hover:text-brand-700 dark:hover:text-brand-400 transition-colors flex items-center justify-center"
+                >
+                  <LogIn size={16} />
+                </button>
               )}
               {MULTI_STUDIO_ENABLED && orgId && (
                 <button
