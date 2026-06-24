@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useApp } from '../../../context/AppContext';
 import {
   Save, Calendar, Plus, Upload, X, Check,
@@ -179,7 +179,7 @@ export default function ShowsTab({
           log(`Found ${showNames.length} show(s) with ${rows.length} total rows`);
           const { newRecitalData, totalActs } = await bulkImportShows(orgId, showMap, recitalData, log);
           setRecitalData(newRecitalData);
-          log(`Done! Created ${showNames.length} shows with ${totalActs} acts.`);
+          log(`Done! Imported ${showNames.length} show(s) with ${totalActs} acts.`);
           showToast(`Imported ${showNames.length} shows, ${totalActs} acts!`, 'success');
         } catch (err) {
           log(`Error: ${err.message}`);
@@ -258,7 +258,7 @@ export default function ShowsTab({
               </table>
             </div>
             <div className="flex items-center justify-between mt-2">
-              <p className="text-[10px] text-ink-400">The <strong>show</strong> column groups acts. Performers separated by semicolons.</p>
+              <p className="text-[10px] text-ink-400">The <strong>show</strong> column groups acts. Performers separated by semicolons. Re-importing a show with the same name <strong>updates it in place</strong> and keeps existing notes.</p>
               <button onClick={downloadCsvTemplate} className="flex items-center gap-1 text-[10px] font-bold text-brand-600 hover:text-brand-700 transition-colors shrink-0 ml-3">
                 <Download size={11} /> Template
               </button>

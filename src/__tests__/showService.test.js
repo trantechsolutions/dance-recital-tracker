@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getDocs, deleteDoc, setDoc, doc, writeBatch } from 'firebase/firestore';
 
-import { deleteShow, deleteStudio, saveShow, updateOrgName, findOrphanedShows, relinkShows } from '../services/showService';
+import { deleteShow, deleteStudio, saveShow, updateOrgName, findOrphanedShows, relinkShows, preserveActIds, uploadActsForShow, bulkImportShows } from '../services/showService';
 
 // Snapshot helper mirroring Firestore's shape. `ref` is attached so service
 // code that calls batch.delete(d.ref) / batch.set(d.ref, ...) works.
@@ -203,6 +203,155 @@ describe('showService.saveShow', () => {
     expect(typeof fresh.id).toBe('string'); // legacy/new act gets a generated id
     expect(fresh.id.length).toBeGreaterThan(0);
     expect(fresh.id).not.toBe('stable-123');
+  });
+});
+
+describe('showService.preserveActIds', () => {
+  const existing = [
+    { id: 'id-open', number: 1, title: 'Opening' },
+    { id: 'id-jazz', number: 2, title: 'Jazz Hands' },
+    { id: 'id-finale', number: 3, title: 'Finale' },
+  ];
+
+  it('carries the existing id onto a matching title even when renumbered', () => {
+    // Jazz Hands moved from #2 to #1; its note must follow by title.
+    const result = preserveActIds(existing, [
+      { number: 1, title: 'Jazz Hands', performers: ['A'] },
+      { number: 2, title: 'Opening', performers: ['B'] },
+    ]);
+    expect(result.find(a => a.title === 'Jazz Hands').id).toBe('id-jazz');
+    expect(result.find(a => a.title === 'Opening').id).toBe('id-open');
+  });
+
+  it('falls back to act number when the title was changed', () => {
+    const result = preserveActIds(existing, [
+      { number: 1, title: 'Opening Number (renamed)', performers: ['A'] },
+    ]);
+    // No title match → claims the act sitting at the same number.
+    expect(result[0].id).toBe('id-open');
+  });
+
+  it('mints a fresh id for genuinely new acts and never reuses one twice', () => {
+    const result = preserveActIds(existing, [
+      { number: 1, title: 'Opening', performers: ['A'] },
+      { number: 2, title: 'Opening', performers: ['B'] }, // duplicate title
+    ]);
+    expect(result[0].id).toBe('id-open');      // first claims the only match
+    expect(result[1].id).not.toBe('id-open');  // second cannot reuse it
+    expect(typeof result[1].id).toBe('string');
+    expect(result[1].id.length).toBeGreaterThan(0);
+  });
+
+  it('keeps an id the incoming act already carries', () => {
+    const result = preserveActIds(existing, [{ number: 9, title: 'X', id: 'explicit-id' }]);
+    expect(result[0].id).toBe('explicit-id');
+  });
+});
+
+describe('showService.uploadActsForShow', () => {
+  let batchSets;
+  let batchDeletes;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    batchSets = [];
+    batchDeletes = [];
+    writeBatch.mockImplementation(() => ({
+      set: (...args) => batchSets.push(args),
+      delete: (...args) => batchDeletes.push(args),
+      commit: () => Promise.resolve(),
+    }));
+  });
+
+  it('preserves existing act ids by title so dancer notes survive re-import', async () => {
+    getDocs.mockResolvedValueOnce(makeSnap([
+      { show_id: 'show1', number: 1, title: 'Opening', performers: ['A'], id: 'stable-open' },
+      { show_id: 'show1', number: 2, title: 'Finale', performers: ['B'], id: 'stable-finale' },
+    ]));
+
+    // Re-import: same titles, reordered, plus a brand-new act. No ids in CSV.
+    const saved = await uploadActsForShow('show1', [
+      { number: 1, title: 'Finale', performers: ['B'] },
+      { number: 2, title: 'Opening', performers: ['A'] },
+      { number: 3, title: 'Encore', performers: ['C'] },
+    ]);
+
+    expect(saved.find(a => a.title === 'Finale').id).toBe('stable-finale');
+    expect(saved.find(a => a.title === 'Opening').id).toBe('stable-open');
+    expect(saved.find(a => a.title === 'Encore').id).not.toBe('stable-open');
+    // Old act docs cleared before the rewrite.
+    expect(batchDeletes).toHaveLength(2);
+  });
+});
+
+describe('showService.bulkImportShows', () => {
+  let batchSets;
+  let batchDeletes;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    batchSets = [];
+    batchDeletes = [];
+    writeBatch.mockImplementation(() => ({
+      set: (...args) => batchSets.push(args),
+      delete: (...args) => batchDeletes.push(args),
+      commit: () => Promise.resolve(),
+    }));
+    setDoc.mockResolvedValue(undefined);
+  });
+
+  it('creates a new show + show_status when no show matches the label', async () => {
+    const log = vi.fn();
+    const { newRecitalData, totalActs } = await bulkImportShows(
+      'org1',
+      { 'Saturday 2pm': [{ number: 1, title: 'Opening', performers: ['A'] }] },
+      {},
+      log,
+    );
+
+    expect(totalActs).toBe(1);
+    // show + show_status created together via a batch (no per-show getDocs).
+    expect(getDocs).not.toHaveBeenCalled();
+    const created = Object.values(newRecitalData)[0];
+    expect(created.label).toBe('Saturday 2pm');
+    expect(created.acts[0].id).toBeTruthy();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('Creating "Saturday 2pm"'));
+  });
+
+  it('updates a same-named show in place, preserving act ids and its show id', async () => {
+    const log = vi.fn();
+    const existingRecitalData = {
+      'org1-saturday-2pm-123': {
+        id: 'org1-saturday-2pm-123',
+        label: 'Saturday 2pm',
+        acts: [
+          { number: 1, title: 'Opening', performers: ['A'], id: 'stable-open' },
+          { number: 2, title: 'Finale', performers: ['B'], id: 'stable-finale' },
+        ],
+      },
+    };
+    // Existing act docs fetched for deletion before the rewrite.
+    getDocs.mockResolvedValueOnce(makeSnap([{ id: 'docA' }, { id: 'docB' }]));
+
+    const { newRecitalData, totalActs } = await bulkImportShows(
+      'org1',
+      { 'Saturday 2pm': [
+        { number: 1, title: 'Finale', performers: ['B'] },
+        { number: 2, title: 'Opening', performers: ['A'] },
+      ] },
+      existingRecitalData,
+      log,
+    );
+
+    expect(totalActs).toBe(2);
+    // No duplicate show: the same show id is reused.
+    expect(Object.keys(newRecitalData)).toEqual(['org1-saturday-2pm-123']);
+    const updated = newRecitalData['org1-saturday-2pm-123'];
+    expect(updated.acts.find(a => a.title === 'Finale').id).toBe('stable-finale');
+    expect(updated.acts.find(a => a.title === 'Opening').id).toBe('stable-open');
+    // Old acts cleared; show_status NOT recreated (only the show doc merged).
+    expect(batchDeletes).toHaveLength(2);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('Updating "Saturday 2pm"'));
   });
 });
 

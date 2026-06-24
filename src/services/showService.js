@@ -46,6 +46,37 @@ async function scrubFavorites(keysToRemove) {
 // ── Acts ─────────────────────────────────────────────────────────────
 
 /**
+ * Carry stable act ids from a show's existing acts onto a freshly imported set
+ * so per-act data — notably private dancer notes, which are keyed by act id —
+ * survives a re-import. CSV rows carry no id, so without this every re-upload
+ * mints brand-new ids and silently orphans every note.
+ *
+ * Matching is claimed at most once per existing act: first by title (so a note
+ * follows its dance even when acts are reordered/renumbered), then by act number
+ * for anything still unmatched. Genuinely new acts fall through to a fresh id.
+ */
+export function preserveActIds(existingActs, incomingActs) {
+  const pool = (existingActs || [])
+    .filter(a => a && a.id)
+    .map(a => ({ id: a.id, title: (a.title || '').trim().toLowerCase(), number: a.number, used: false }));
+
+  const claim = (predicate) => {
+    const match = pool.find(e => !e.used && predicate(e));
+    if (match) { match.used = true; return match.id; }
+    return null;
+  };
+
+  // Pass 1: title matches across all incoming acts. Pass 2: number matches for
+  // whatever is left. An act that already has an id (non-CSV callers) keeps it.
+  const tagged = incomingActs.map(act => {
+    const title = (act.title || '').trim().toLowerCase();
+    return { act, id: act.id || claim(e => e.title && e.title === title) };
+  });
+  tagged.forEach(t => { if (!t.id) t.id = claim(e => e.number === t.act.number); });
+  return tagged.map(t => ({ ...t.act, id: t.id || newActId() }));
+}
+
+/**
  * Atomically replace all acts for a show and upsert the show document.
  */
 export async function saveShow(orgId, showId, label, cleanedActs) {
@@ -89,10 +120,11 @@ export async function createShow(orgId, id, label) {
  * Returns the saved acts (number/title/performers only).
  */
 export async function uploadActsForShow(showId, validatedActs) {
-  // Assign stable ids once so the persisted doc and the returned (local-state)
-  // act share the same id.
-  const actsWithIds = validatedActs.map(act => ({ ...act, id: act.id || newActId() }));
   const existing = await getDocs(query(collection(db, coll('acts')), where('show_id', '==', showId)));
+  // Reuse stable ids from the show's current acts so private dancer notes (keyed
+  // by act id) survive the re-import; the persisted doc and the returned
+  // (local-state) act share the same id.
+  const actsWithIds = preserveActIds(existing.docs.map(d => d.data()), validatedActs);
   const batch = writeBatch(db);
   existing.docs.forEach(d => batch.delete(d.ref));
   actsWithIds.forEach(act => {
@@ -114,24 +146,50 @@ export async function bulkImportShows(orgId, showMap, existingRecitalData, onPro
   let totalActs = 0;
   const newRecitalData = { ...existingRecitalData };
 
+  // Index existing shows by normalized label so re-importing a show with the
+  // same name updates that show in place — reusing its id and (via
+  // preserveActIds) its act ids, so dancer notes survive — instead of spawning
+  // a duplicate show. Rename a show's label to force a fresh import.
+  const existingByLabel = {};
+  for (const [id, data] of Object.entries(existingRecitalData || {})) {
+    const label = (data?.label || '').trim().toLowerCase();
+    if (label && !(label in existingByLabel)) existingByLabel[label] = id;
+  }
+
   for (const showName of showNames) {
-    const showId = `${orgId}-${showName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Date.now()}`;
-    // Assign stable ids once, shared by the persisted docs and newRecitalData.
-    const acts = showMap[showName].map(act => ({ ...act, id: act.id || newActId() }));
+    const existingId = existingByLabel[showName.trim().toLowerCase()];
+    const showId = existingId
+      || `${orgId}-${showName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Date.now()}`;
+    // Reuse stable ids from the existing show (if any), shared by the persisted
+    // docs and newRecitalData.
+    const acts = preserveActIds(existingId ? (newRecitalData[existingId]?.acts || []) : [], showMap[showName]);
 
-    onProgress(`Creating "${showName}" (${acts.length} acts)...`);
-
-    // Atomically create the show doc + show_status together
-    const initBatch = writeBatch(db);
-    initBatch.set(doc(db, coll('shows'), showId), { org_id: orgId, label: showName, updated_at: new Date().toISOString() });
-    initBatch.set(doc(db, coll('show_status'), showId), {
-      show_id: showId,
-      org_id: orgId,
-      current_act_number: 1,
-      is_tracking: false,
-      updated_at: new Date().toISOString(),
-    });
-    await initBatch.commit();
+    if (existingId) {
+      onProgress(`Updating "${showName}" (${acts.length} acts)...`);
+      // Clear the show's current acts; the show + show_status docs stay intact
+      // (so a live tracker's position isn't disturbed). New acts written below.
+      const prevActs = await getDocs(query(collection(db, coll('acts')), where('show_id', '==', showId)));
+      for (let i = 0; i < prevActs.docs.length; i += 400) {
+        const batch = writeBatch(db);
+        prevActs.docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+      await setDoc(doc(db, coll('shows'), showId),
+        { org_id: orgId, label: showName, updated_at: new Date().toISOString() }, { merge: true });
+    } else {
+      onProgress(`Creating "${showName}" (${acts.length} acts)...`);
+      // Atomically create the show doc + show_status together
+      const initBatch = writeBatch(db);
+      initBatch.set(doc(db, coll('shows'), showId), { org_id: orgId, label: showName, updated_at: new Date().toISOString() });
+      initBatch.set(doc(db, coll('show_status'), showId), {
+        show_id: showId,
+        org_id: orgId,
+        current_act_number: 1,
+        is_tracking: false,
+        updated_at: new Date().toISOString(),
+      });
+      await initBatch.commit();
+    }
 
     for (let i = 0; i < acts.length; i += 400) {
       const chunk = acts.slice(i, i + 400);
