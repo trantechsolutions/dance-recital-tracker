@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { auth, db, authorizedUsers, coll } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
 import { MULTI_STUDIO_ENABLED, DEFAULT_ORG_ID } from '../config';
 
 const AppContext = createContext();
@@ -17,6 +17,9 @@ export function AppProvider({ children }) {
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [hasSkippedLogin, setHasSkippedLogin] = useState(() => localStorage.getItem('hasSkippedLogin') === 'true');
   const [favorites, setFavorites] = useState(new Set());
+  // Private per-dancer-per-act notes (outfit/hairstyle, etc.), keyed by
+  // `${showId}::${actNumber}::${dancer}`. Stored on the user's own profile.
+  const [dancerNotes, setDancerNotes] = useState({});
   const [orgId, setOrgId] = useState(() => {
     // Single-studio mode: a configured default org is authoritative (overrides
     // any stale localStorage value from a prior multi-studio session).
@@ -31,6 +34,12 @@ export function AppProvider({ children }) {
   const invalidDefaultOrg = useRef(false);
   const [orgName, setOrgName] = useState('');
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
+  // "How to use" tutorial. The 'general' variant is the user-facing tour that
+  // auto-opens once on first run (tracked in localStorage); the 'admin' variant
+  // is launched on demand from the admin panel's help (?) button and explains
+  // the admin console only.
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialVariant, setTutorialVariant] = useState('general');
 
   // --- Auth & Favorites Sync ---
   useEffect(() => {
@@ -53,6 +62,7 @@ export function AppProvider({ children }) {
           setIsSuperAdmin(false);
           setIsStudioAdmin(false);
           setFavorites(new Set());
+          setDancerNotes({});
         }
       } catch (err) {
         console.error("[Auth] onAuthStateChanged error:", err);
@@ -80,10 +90,13 @@ export function AppProvider({ children }) {
     const profileRef = doc(db, coll('user_profiles'), u.uid);
     const profileSnap = await getDoc(profileRef);
 
-    if (profileSnap.exists() && profileSnap.data().favorites) {
-      setFavorites(new Set(profileSnap.data().favorites));
+    if (profileSnap.exists()) {
+      const data = profileSnap.data();
+      setFavorites(new Set(data.favorites || []));
+      setDancerNotes(data.dancerNotes || {});
     } else {
       setFavorites(new Set());
+      setDancerNotes({});
     }
 
     // Upsert user profile with login timestamp
@@ -189,9 +202,65 @@ export function AppProvider({ children }) {
     return true;
   };
 
+  // Add, update, or (with empty text) clear a private note for one dancer in
+  // one act. Writes the whole map via updateDoc so cleared keys are removed —
+  // a setDoc merge would deep-merge and leave stale keys behind. Optimistic
+  // with rollback, mirroring toggleFavorite.
+  const setDancerNote = async (key, text) => {
+    if (!user) {
+      setLoginPromptOpen(true);
+      return false;
+    }
+    const trimmed = (text || '').trim().slice(0, 500);
+    setDancerNotes(prev => {
+      const next = { ...prev };
+      if (trimmed) next[key] = trimmed;
+      else delete next[key];
+
+      const profileRef = doc(db, coll('user_profiles'), user.uid);
+      updateDoc(profileRef, { dancerNotes: next })
+        .catch(() =>
+          // Doc may not exist yet (first write) — create it, then fall back
+          // to rollback if that fails too.
+          setDoc(profileRef, { dancerNotes: next }, { merge: true })
+            .catch(() => setDancerNotes(prev))
+        );
+
+      return next;
+    });
+    return true;
+  };
+
   const skipLogin = () => {
     setHasSkippedLogin(true);
     localStorage.setItem('hasSkippedLogin', 'true');
+  };
+
+  // --- Tutorial ---
+  const TUTORIAL_SEEN_KEY = 'tutorialSeen_v1';
+  // True the very first time a visitor reaches the app (no dismissal stored).
+  const tutorialNeverSeen = () => !localStorage.getItem(TUTORIAL_SEEN_KEY);
+  // Explicit re-trigger (admin "?" help, Settings replay, dev-tools preview).
+  // Does not touch the localStorage flag — only dismissal of the general tour
+  // records that.
+  const openTutorial = (variant = 'general') => {
+    setTutorialVariant(variant === 'admin' ? 'admin' : 'general');
+    setShowTutorial(true);
+  };
+  // Close. Only the general (user-facing) tour records the first-run flag so it
+  // never auto-opens again; the on-demand admin tour leaves it untouched.
+  const dismissTutorial = () => {
+    if (tutorialVariant === 'general') {
+      localStorage.setItem(TUTORIAL_SEEN_KEY, new Date().toISOString());
+    }
+    setShowTutorial(false);
+  };
+  // Clear the "seen" flag so the genuine first-run auto-open fires again on the
+  // next load — lets an admin test the real first-time experience, not just the
+  // replay.
+  const resetTutorial = () => {
+    localStorage.removeItem(TUTORIAL_SEEN_KEY);
+    setShowTutorial(false);
   };
 
   const clearSkipLogin = () => {
@@ -203,8 +272,10 @@ export function AppProvider({ children }) {
     user, isAuthorized, isSuperAdmin, isStudioAdmin, isAuthChecking,
     hasSkippedLogin, skipLogin, clearSkipLogin,
     favorites, toggleFavorite,
+    dancerNotes, setDancerNote,
     orgId, setOrgId, orgName, setOrgName, orgResolveAttempted,
     loginPromptOpen, setLoginPromptOpen,
+    showTutorial, tutorialVariant, openTutorial, dismissTutorial, resetTutorial, tutorialNeverSeen,
   };
 
   return (

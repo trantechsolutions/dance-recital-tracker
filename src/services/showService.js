@@ -1,4 +1,5 @@
 import { db, coll } from '../firebase';
+import { newActId } from '../utils/ids';
 import {
   collection, doc, getDocs, setDoc, deleteDoc, query,
   where, writeBatch
@@ -60,6 +61,9 @@ export async function saveShow(orgId, showId, label, cleanedActs) {
       number: act.number,
       title: act.title,
       performers: act.performers,
+      // Stable logical id — preserved from the act if it already has one
+      // (so reorders/edits keep it), generated here for legacy/new acts.
+      id: act.id || newActId(),
     });
   });
 
@@ -85,16 +89,19 @@ export async function createShow(orgId, id, label) {
  * Returns the saved acts (number/title/performers only).
  */
 export async function uploadActsForShow(showId, validatedActs) {
+  // Assign stable ids once so the persisted doc and the returned (local-state)
+  // act share the same id.
+  const actsWithIds = validatedActs.map(act => ({ ...act, id: act.id || newActId() }));
   const existing = await getDocs(query(collection(db, coll('acts')), where('show_id', '==', showId)));
   const batch = writeBatch(db);
   existing.docs.forEach(d => batch.delete(d.ref));
-  validatedActs.forEach(act => {
+  actsWithIds.forEach(act => {
     batch.set(doc(collection(db, coll('acts'))), { show_id: showId, ...act });
   });
   // Bump updated_at so live viewers refetch acts (their cache is keyed on it).
   batch.set(doc(db, coll('shows'), showId), { updated_at: new Date().toISOString() }, { merge: true });
   await batch.commit();
-  return validatedActs.map(({ number, title, performers }) => ({ number, title, performers }));
+  return actsWithIds.map(({ number, title, performers, id }) => ({ number, title, performers, id }));
 }
 
 /**
@@ -109,7 +116,8 @@ export async function bulkImportShows(orgId, showMap, existingRecitalData, onPro
 
   for (const showName of showNames) {
     const showId = `${orgId}-${showName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Date.now()}`;
-    const acts = showMap[showName];
+    // Assign stable ids once, shared by the persisted docs and newRecitalData.
+    const acts = showMap[showName].map(act => ({ ...act, id: act.id || newActId() }));
 
     onProgress(`Creating "${showName}" (${acts.length} acts)...`);
 
@@ -134,6 +142,7 @@ export async function bulkImportShows(orgId, showMap, existingRecitalData, onPro
           number: act.number,
           title: act.title,
           performers: act.performers,
+          id: act.id,
         });
       });
       await batch.commit();
@@ -142,7 +151,7 @@ export async function bulkImportShows(orgId, showMap, existingRecitalData, onPro
     newRecitalData[showId] = {
       id: showId,
       label: showName,
-      acts: acts.map(({ number, title, performers }) => ({ number, title, performers })),
+      acts: acts.map(({ number, title, performers, id }) => ({ number, title, performers, id })),
     };
     totalActs += acts.length;
   }

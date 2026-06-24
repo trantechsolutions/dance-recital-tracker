@@ -40,7 +40,7 @@ export default function LiveShowController({ showData, currentAct, updateActNumb
         <div className="flex items-center gap-2">
           <Radio size={16} className={clsx(isTracking ? "text-brand-500 animate-pulse" : "text-ink-600")} />
           <span className="text-xs font-semibold uppercase tracking-widest text-ink-400">
-            {isTracking ? 'Live' : 'Paused'} â€” {showData?.label}
+            {isTracking ? 'Live' : 'Paused'} — {showData?.label}
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -78,7 +78,7 @@ export default function LiveShowController({ showData, currentAct, updateActNumb
           </h1>
           {currentActData?.performers?.length > 0 && (
             <p className="text-ink-400 text-base leading-relaxed">
-              {currentActData.performers.join(' Â· ')}
+              {currentActData.performers.join(' · ')}
             </p>
           )}
         </div>
@@ -142,7 +142,7 @@ export default function LiveShowController({ showData, currentAct, updateActNumb
       {/* Keyboard hint */}
       <div className="pb-6 text-center">
         <p className="text-[10px] text-ink-700 font-bold tracking-widest uppercase">
-          â† â†’ Arrow keys â€¢ Space = Next â€¢ Esc = Close
+          ← → Arrow keys • Space = Next • Esc = Close
         </p>
       </div>
     </div>

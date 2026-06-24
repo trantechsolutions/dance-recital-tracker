@@ -286,7 +286,7 @@ export default function ShowsTab({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-3">
               <label className="text-[10px] font-semibold text-ink-400 uppercase mb-1 block">Display Title</label>
-              <input type="text" placeholder="e.g. 2026 Spring Recital â€” Saturday 2pm"
+              <input type="text" placeholder="e.g. 2026 Spring Recital — Saturday 2pm"
                 className="w-full bg-ink-50 dark:bg-ink-900 p-4 rounded-card text-ink-900 dark:text-white text-lg font-bold outline-none focus:ring-2 focus:ring-brand-500"
                 value={newShowForm.label} onChange={e => setNewShowForm({ ...newShowForm, label: e.target.value })} />
             </div>
@@ -370,7 +370,7 @@ export default function ShowsTab({
               <div>
                 <h3 className="font-semibold text-sm dark:text-white">Live Tracker</h3>
                 <p className="text-[10px] font-bold text-ink-400">
-                  {currentAct?.isTracking ? 'Broadcasting live to all viewers' : 'Not tracking â€” viewers see the full program'}
+                  {currentAct?.isTracking ? 'Broadcasting live to all viewers' : 'Not tracking — viewers see the full program'}
                 </p>
               </div>
             </div>

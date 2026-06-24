@@ -1,11 +1,123 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Heart, Star, Music, ArrowRight, Clock } from 'lucide-react';
+import { Heart, Star, Music, ArrowRight, Clock, Pencil, Check } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Link } from 'react-router-dom';
 
+// Per-dancer-per-act note key. Keyed by the act's stable `id` so notes stay
+// attached to the dance across reorders/renumbering. Acts saved before stable
+// ids existed have no `id` yet; they fall back to `#<number>` until the show is
+// next saved (which backfills the id) — at which point any note on a legacy act
+// re-keys. The dancer half is still the name, matching favorites, so renaming a
+// performer still moves their note.
+const dancerNoteKey = (showId, act, dancer) =>
+  `${showId || 'show'}::${act.id || `#${act.number}`}::${dancer}`;
+
+// A favorited dancer chip with an inline, editable private note.
+function DancerNote({ dancer, note, isCurrent, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(note || '');
+  const cancelling = useRef(false);
+
+  const startEditing = () => { setDraft(note || ''); setEditing(true); };
+
+  const commit = () => {
+    if (cancelling.current) { cancelling.current = false; return; }
+    setEditing(false);
+    if (draft.trim() !== (note || '')) onSave(draft);
+  };
+
+  const cancel = () => {
+    cancelling.current = true;
+    setDraft(note || '');
+    setEditing(false);
+  };
+
+  return (
+    <div className={clsx(
+      "rounded-lg px-2.5 py-1.5",
+      isCurrent ? "bg-white/20" : "bg-brand-50 dark:bg-brand-900/20"
+    )}>
+      <div className="flex items-center gap-1.5">
+        <Heart
+          size={11}
+          fill="currentColor"
+          className={isCurrent ? "text-white" : "text-brand-500 dark:text-brand-400"}
+        />
+        <span className={clsx(
+          "text-xs font-bold",
+          isCurrent ? "text-white" : "text-brand-600 dark:text-brand-400"
+        )}>
+          {dancer}
+        </span>
+        {!editing && (
+          <button
+            type="button"
+            onClick={startEditing}
+            aria-label={note ? `Edit note for ${dancer}` : `Add note for ${dancer}`}
+            className={clsx(
+              "ml-auto inline-flex items-center gap-1 text-[10px] font-semibold transition-colors",
+              isCurrent
+                ? "text-white/70 hover:text-white"
+                : "text-ink-400 hover:text-brand-600 dark:hover:text-brand-300"
+            )}
+          >
+            <Pencil size={11} />
+            {!note && <span>Note</span>}
+          </button>
+        )}
+      </div>
+
+      {editing ? (
+        <div className="flex items-center gap-1.5 mt-1.5">
+          <input
+            type="text"
+            autoFocus
+            value={draft}
+            maxLength={500}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); commit(); }
+              else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+            }}
+            onBlur={commit}
+            placeholder="Outfit, hairstyle, props…"
+            className={clsx(
+              "flex-1 min-w-0 px-2 py-1 text-[11px] rounded-md border focus:outline-none focus:ring-2 transition-all",
+              isCurrent
+                ? "bg-white/90 border-white/40 text-ink-800 placeholder-ink-400 focus:ring-white/40"
+                : "bg-white dark:bg-ink-900 border-ink-200 dark:border-ink-700 dark:text-white placeholder-ink-400 focus:ring-brand-500/30 focus:border-brand-500"
+            )}
+          />
+          {/* onMouseDown (not onClick) so it fires before the input's onBlur */}
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); commit(); }}
+            aria-label="Save note"
+            className={clsx(
+              "shrink-0 p-1 rounded-md transition-colors",
+              isCurrent
+                ? "text-white hover:bg-white/20"
+                : "text-brand-600 hover:bg-brand-100 dark:hover:bg-brand-900/40"
+            )}
+          >
+            <Check size={13} />
+          </button>
+        </div>
+      ) : note ? (
+        <p className={clsx(
+          "text-[11px] leading-snug mt-0.5 whitespace-pre-wrap break-words",
+          isCurrent ? "text-white/80" : "text-ink-500 dark:text-ink-400"
+        )}>
+          {note}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export default function MyScheduleView({ showData, currentAct, showId }) {
-  const { favorites, toggleFavorite } = useApp();
+  const { favorites, toggleFavorite, dancerNotes, setDancerNote } = useApp();
 
   // Build a timeline of favorited acts in order
   const schedule = useMemo(() => {
@@ -173,25 +285,21 @@ export default function MyScheduleView({ showData, currentAct, showId }) {
                     </button>
                   </div>
 
-                  {/* Favorited dancers highlight */}
+                  {/* Favorited dancers — each with an editable private note */}
                   {act.favoritedDancers.length > 0 && (
-                    <div className={clsx(
-                      "mt-3 flex flex-wrap gap-1.5",
-                    )}>
-                      {act.favoritedDancers.map(dancer => (
-                        <span
-                          key={dancer}
-                          className={clsx(
-                            "inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg",
-                            isCurrent
-                              ? "bg-white/20 text-white"
-                              : "bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400"
-                          )}
-                        >
-                          <Heart size={10} fill="currentColor" />
-                          {dancer}
-                        </span>
-                      ))}
+                    <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
+                      {act.favoritedDancers.map(dancer => {
+                        const key = dancerNoteKey(showId, act, dancer);
+                        return (
+                          <DancerNote
+                            key={dancer}
+                            dancer={dancer}
+                            note={dancerNotes?.[key] || ''}
+                            isCurrent={isCurrent}
+                            onSave={(text) => setDancerNote(key, text)}
+                          />
+                        );
+                      })}
                     </div>
                   )}
 

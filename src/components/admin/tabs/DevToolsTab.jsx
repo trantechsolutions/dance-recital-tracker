@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useApp } from '../../../context/AppContext';
-import { Check, Link2, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
+import { Check, Link2, RefreshCw, Sparkles, Trash2, GraduationCap } from 'lucide-react';
 import { clsx } from 'clsx';
 import { seedDatabase, clearSeedData } from '../../../utils/seedData';
 import { findOrphanedShows, relinkShows } from '../../../services/showService';
 
 export default function DevToolsTab({ showToast, setConfirmModal }) {
-  const { setOrgId, orgId, orgName } = useApp();
+  const { setOrgId, orgId, orgName, openTutorial, resetTutorial } = useApp();
   const [isSeeding, setIsSeeding] = useState(false);
   const [seedLog, setSeedLog] = useState([]);
   const [orphans, setOrphans] = useState(null); // null = not scanned yet
@@ -43,7 +43,7 @@ export default function DevToolsTab({ showToast, setConfirmModal }) {
   const handleSeedData = () => {
     setConfirmModal({
       title: 'Seed Database',
-      message: 'This will create 2â€“4 random studios with shows and acts. Continue?',
+      message: 'This will create 2–4 random studios with shows and acts. Continue?',
       variant: 'warning',
       confirmLabel: 'Seed Data',
       onConfirm: async () => {
@@ -101,11 +101,37 @@ export default function DevToolsTab({ showToast, setConfirmModal }) {
       <h2 className="text-2xl font-semibold dark:text-white">Developer Tools</h2>
 
       <div className="bg-white dark:bg-ink-800 p-6 rounded-card border border-ink-200 dark:border-ink-700">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-brand-100 dark:bg-brand-900/30 text-brand-600 rounded-card shrink-0"><GraduationCap size={22} /></div>
+            <div>
+              <h3 className="font-semibold dark:text-white mb-0.5">How-To Tutorial</h3>
+              <p className="text-xs text-ink-400 mb-3">Preview the first-run walkthrough new users see. It explains each menu and its capabilities.</p>
+              <button
+                onClick={() => {
+                  resetTutorial();
+                  showToast('First-run flag cleared — reloading to show the tutorial as a new visitor sees it…', 'success');
+                  setTimeout(() => window.location.reload(), 1200);
+                }}
+                className="text-xs font-bold text-ink-500 hover:text-brand-600 dark:hover:text-brand-400 transition-colors underline underline-offset-2"
+              >
+                Reset first-run &amp; reload (test the real auto-open)
+              </button>
+            </div>
+          </div>
+          <button onClick={openTutorial}
+            className="px-5 py-2.5 bg-brand-600 text-white rounded-card font-bold text-sm hover:bg-brand-700 active:scale-95 transition-all shadow-md shadow-brand-500/20 shrink-0">
+            Launch
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-ink-800 p-6 rounded-card border border-ink-200 dark:border-ink-700">
         <div className="flex items-start gap-4">
           <div className="p-3 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded-card shrink-0"><Sparkles size={22} /></div>
           <div className="flex-1">
             <h3 className="font-semibold dark:text-white mb-0.5">Seed Demo Data</h3>
-            <p className="text-xs text-ink-400 mb-4">Generate 2â€“4 random studios, each with 1â€“5 shows and 20â€“35 acts per show. Each seed is unique.</p>
+            <p className="text-xs text-ink-400 mb-4">Generate 2–4 random studios, each with 1–5 shows and 20–35 acts per show. Each seed is unique.</p>
             {seedLog.length > 0 && (
               <div className="mb-4 bg-ink-50 dark:bg-ink-900 rounded-card p-3 max-h-40 overflow-y-auto space-y-1">
                 {seedLog.map((msg, i) => (

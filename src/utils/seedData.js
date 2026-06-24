@@ -1,4 +1,5 @@
 import { db, coll } from '../firebase';
+import { newActId } from './ids';
 import { collection, doc, setDoc, deleteDoc, getDoc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 
 // ── Name Pools ─────────────────────────────────────────────────────
@@ -236,6 +237,7 @@ export async function seedDatabase(onProgress) {
             number: act.number,
             title: act.title,
             performers: act.performers,
+            id: act.id || newActId(),
           });
           act.performers.forEach(p => manifest.allPerformers.add(p));
         }

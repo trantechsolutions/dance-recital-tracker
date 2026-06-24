@@ -24,6 +24,7 @@ import StudioSelector from './components/StudioSelector';
 import ShowSelector from './components/ui/ShowSelector';
 import FloatingButtons from './components/ui/FloatingButtons';
 import LoginPromptModal from './components/ui/LoginPromptModal';
+import TutorialOverlay from './components/ui/TutorialOverlay';
 
 // Helper component
 function LoadingScreen({ text }) {
@@ -336,6 +337,9 @@ export default function App() {
         onClose={() => setLoginPromptOpen(false)}
         onGoToSettings={() => { setLoginPromptOpen(false); navigate('/settings'); }}
       />
+
+      {/* --- FIRST-RUN "HOW TO USE" TUTORIAL --- */}
+      <TutorialOverlay />
     </div>
   );
 }

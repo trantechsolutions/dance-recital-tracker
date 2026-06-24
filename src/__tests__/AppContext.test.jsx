@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, act, waitFor } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -190,6 +189,55 @@ describe('AppContext', () => {
 
     expect(localStorage.getItem('hasSkippedLogin')).toBeNull();
     expect(captured.hasSkippedLogin).toBe(false);
+  });
+
+  it('tutorial: openTutorial shows it, dismissTutorial hides it and records the seen flag', async () => {
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+    await act(async () => { authCallback(null); });
+
+    // Fresh visitor: nothing stored, so first-run should be due.
+    expect(captured.tutorialNeverSeen()).toBe(true);
+    expect(captured.showTutorial).toBe(false);
+
+    act(() => { captured.openTutorial(); });
+    expect(captured.showTutorial).toBe(true);
+
+    act(() => { captured.dismissTutorial(); });
+    expect(captured.showTutorial).toBe(false);
+    expect(captured.tutorialNeverSeen()).toBe(false); // flag persisted
+    expect(localStorage.getItem('tutorialSeen_v1')).not.toBeNull();
+  });
+
+  it('tutorial: the admin variant opens without recording the general first-run flag', async () => {
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+    await act(async () => { authCallback(null); });
+
+    act(() => { captured.openTutorial('admin'); });
+    expect(captured.showTutorial).toBe(true);
+    expect(captured.tutorialVariant).toBe('admin');
+
+    act(() => { captured.dismissTutorial(); });
+    expect(captured.showTutorial).toBe(false);
+    // Admin tour must NOT suppress the user-facing first-run auto-open.
+    expect(localStorage.getItem('tutorialSeen_v1')).toBeNull();
+    expect(captured.tutorialNeverSeen()).toBe(true);
+  });
+
+  it('tutorial: resetTutorial clears the seen flag so first-run fires again', async () => {
+    localStorage.setItem('tutorialSeen_v1', new Date().toISOString());
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+    await act(async () => { authCallback(null); });
+
+    expect(captured.tutorialNeverSeen()).toBe(false);
+
+    act(() => { captured.resetTutorial(); });
+
+    expect(localStorage.getItem('tutorialSeen_v1')).toBeNull();
+    expect(captured.tutorialNeverSeen()).toBe(true);
   });
 });
 

@@ -113,7 +113,7 @@ export default function SearchView({ showData, selectedShow, favorites, currentA
     );
   }
 
-  const placeholder = activeTab === 'acts' ? 'Search acts by title, number, or performerâ€¦' : 'Search dancers by nameâ€¦';
+  const placeholder = activeTab === 'acts' ? 'Search acts by title, number, or performer…' : 'Search dancers by name…';
 
   return (
     <div className="space-y-3 sm:space-y-4 animate-in fade-in pb-6">

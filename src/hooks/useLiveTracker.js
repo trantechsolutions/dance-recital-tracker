@@ -62,6 +62,9 @@ export function useLiveTracker(orgId, selectedShowId) {
             actsCache.current[show.id] = {
               updatedAt: show.updated_at ?? null,
               acts: fetched[i].docs.map(d => ({
+                // Use the persisted `id` field, never the Firestore doc id
+                // (d.id) — doc ids churn on every save, this field is stable.
+                id: d.data().id,
                 number: d.data().number,
                 title: d.data().title,
                 performers: d.data().performers || []

@@ -71,8 +71,8 @@ describe('useLiveTracker', () => {
         id: 'show1',
         label: 'Saturday Show',
         acts: [
-          { number: 1, title: 'Opening', performers: ['Alice', 'Bob'] },
-          { number: 2, title: 'Jazz', performers: [] },
+          { id: 'a1', number: 1, title: 'Opening', performers: ['Alice', 'Bob'] },
+          { id: 'a2', number: 2, title: 'Jazz', performers: [] },
         ],
       },
     });

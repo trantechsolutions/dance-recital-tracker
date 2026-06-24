@@ -185,6 +185,25 @@ describe('showService.saveShow', () => {
 
     expect(batchSets[0][1]).toMatchObject({ label: 'Saturday Matinee (corrected)' });
   });
+
+  it('preserves an existing act id and generates one for acts that lack it', async () => {
+    getDocs.mockResolvedValueOnce(makeSnap([])); // no existing acts
+
+    await saveShow('org1', 'show1', 'Saturday', [
+      { number: 1, title: 'Kept', performers: ['A'], id: 'stable-123' },
+      { number: 2, title: 'New', performers: ['B'] },
+    ]);
+
+    // batchSets[0] is the show doc; act writes follow.
+    const actWrites = batchSets.slice(1).map(args => args[1]);
+    const kept = actWrites.find(a => a.title === 'Kept');
+    const fresh = actWrites.find(a => a.title === 'New');
+
+    expect(kept.id).toBe('stable-123'); // reorder/edit keeps the same id
+    expect(typeof fresh.id).toBe('string'); // legacy/new act gets a generated id
+    expect(fresh.id.length).toBeGreaterThan(0);
+    expect(fresh.id).not.toBe('stable-123');
+  });
 });
 
 describe('showService.findOrphanedShows', () => {

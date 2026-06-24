@@ -50,7 +50,7 @@ export default function PerformerEditor({ performers = [], onChange }) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Add performer nameâ€¦"
+          placeholder="Add performer name…"
           className="flex-1 px-3 py-2 text-sm bg-ink-50 dark:bg-ink-900 border border-ink-200 dark:border-ink-700 rounded-card focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500 dark:text-white placeholder-ink-400 transition-all"
         />
         <button

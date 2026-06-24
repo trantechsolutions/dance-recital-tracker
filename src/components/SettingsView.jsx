@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Sun, Moon, Monitor, LogOut, Info, ChevronRight, User, Building2, AlertCircle, ShieldAlert } from 'lucide-react';
+import { Sun, Moon, Monitor, LogOut, Info, ChevronRight, User, Building2, AlertCircle, ShieldAlert, GraduationCap } from 'lucide-react';
 import { marked } from 'marked';
 import { auth, googleProvider } from '../firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signOut } from 'firebase/auth';
@@ -11,7 +11,7 @@ import { Link } from 'react-router-dom';
 import { MULTI_STUDIO_ENABLED } from '../config';
 
 export default function SettingsView() {
-  const { user, setOrgId, clearSkipLogin, isAuthorized } = useApp();
+  const { user, setOrgId, clearSkipLogin, isAuthorized, openTutorial } = useApp();
 
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
   const [changelog, setChangelog] = useState('');
@@ -87,7 +87,7 @@ export default function SettingsView() {
 
       <h2 className="text-xl sm:text-2xl font-semibold dark:text-white px-0.5">Settings</h2>
 
-      {/* Admin Console â€” visible on mobile only (desktop uses sidebar) */}
+      {/* Admin Console — visible on mobile only (desktop uses sidebar) */}
       {isAuthorized && (
         <Link
           to="/admin"
@@ -218,6 +218,19 @@ export default function SettingsView() {
           <ThemeOption active={theme === 'dark'} onClick={() => setTheme('dark')} icon={<Moon size={20}/>} label="Dark" />
           <ThemeOption active={theme === 'system'} onClick={() => setTheme('system')} icon={<Monitor size={20}/>} label="System" />
         </div>
+      </section>
+
+      {/* How to use */}
+      <section>
+        <button
+          onClick={openTutorial}
+          className="w-full p-4 bg-white dark:bg-ink-800 border border-ink-200 dark:border-ink-700 rounded-card flex justify-between items-center shadow-sm hover:border-brand-300 dark:hover:border-brand-700 transition-colors group"
+        >
+          <div className="flex items-center gap-3 text-ink-600 dark:text-ink-300 font-bold text-sm">
+            <GraduationCap size={18} className="text-brand-600" /> How to use this app
+          </div>
+          <ChevronRight size={18} className="text-ink-400 group-hover:translate-x-0.5 transition-transform" />
+        </button>
       </section>
 
       {/* Version Info */}

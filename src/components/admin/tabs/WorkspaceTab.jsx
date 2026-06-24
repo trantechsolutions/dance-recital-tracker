@@ -59,7 +59,7 @@ function downloadCsvTemplate() {
   URL.revokeObjectURL(url);
 }
 
-// â”€â”€â”€ Studio Context Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Studio Context Bar ────────────────────────────────────────────────────────
 
 function StudioContextBar({ allOrgs, loadingOrgs, fetchAllOrgs, onCreateOrg, showToast }) {
   const { orgId, setOrgId, orgName } = useApp();
@@ -212,7 +212,7 @@ function StudioContextBar({ allOrgs, loadingOrgs, fetchAllOrgs, onCreateOrg, sho
   );
 }
 
-// â”€â”€â”€ Manage Studio Accordion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Manage Studio Accordion ───────────────────────────────────────────────────
 
 function ManageStudioAccordion({ orgData, setOrgData, showToast, setPromptModal, setSelectedShow, fetchAllOrgs }) {
   const { orgId, setOrgId, setOrgName } = useApp();
@@ -425,7 +425,7 @@ function ManageStudioAccordion({ orgData, setOrgData, showToast, setPromptModal,
   );
 }
 
-// â”€â”€â”€ WorkspaceTab (main export) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── WorkspaceTab (main export) ────────────────────────────────────────────────
 
 export default function WorkspaceTab({
   recitalData, setRecitalData, invalidateActsCache,
@@ -631,7 +631,7 @@ export default function WorkspaceTab({
   return (
     <div className="space-y-5 animate-in fade-in">
 
-      {/* â”€â”€ Studio Context Bar â”€â”€ */}
+      {/* ── Studio Context Bar ── */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <StudioContextBar
           allOrgs={allOrgs}
@@ -646,7 +646,7 @@ export default function WorkspaceTab({
         )}
       </div>
 
-      {/* â”€â”€ No studio selected prompt â”€â”€ */}
+      {/* ── No studio selected prompt ── */}
       {!orgId && (
         <div className="text-center py-16 bg-white dark:bg-ink-800 rounded-card border-2 border-dashed border-ink-200 dark:border-ink-700 animate-in fade-in">
           <Building2 size={48} className="mx-auto text-ink-200 dark:text-ink-700 mb-4" />
@@ -655,7 +655,7 @@ export default function WorkspaceTab({
         </div>
       )}
 
-      {/* â”€â”€ Shows & Acts Workspace â”€â”€ */}
+      {/* ── Shows & Acts Workspace ── */}
       {orgId && (
         <div className="space-y-4">
           {/* Shows Header */}
@@ -740,7 +740,7 @@ export default function WorkspaceTab({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-3">
                   <label className="text-[10px] font-semibold text-ink-400 uppercase mb-1 block">Display Title</label>
-                  <input type="text" placeholder="e.g. 2026 Spring Recital â€” Saturday 2pm"
+                  <input type="text" placeholder="e.g. 2026 Spring Recital — Saturday 2pm"
                     className="w-full bg-ink-50 dark:bg-ink-900 p-4 rounded-card text-ink-900 dark:text-white text-lg font-bold outline-none focus:ring-2 focus:ring-brand-500"
                     value={newShowForm.label} onChange={e => setNewShowForm({ ...newShowForm, label: e.target.value })} />
                 </div>
@@ -841,7 +841,7 @@ export default function WorkspaceTab({
                   <div>
                     <h3 className="font-semibold text-sm dark:text-white">Live Tracker</h3>
                     <p className="text-[10px] font-bold text-ink-400">
-                      {currentAct?.isTracking ? 'Broadcasting live to all viewers' : 'Not tracking â€” viewers see the full program'}
+                      {currentAct?.isTracking ? 'Broadcasting live to all viewers' : 'Not tracking — viewers see the full program'}
                     </p>
                   </div>
                 </div>
@@ -993,7 +993,7 @@ export default function WorkspaceTab({
         </div>
       )}
 
-      {/* â”€â”€ Manage Studio Accordion (super admin only, collapsed) â”€â”€ */}
+      {/* ── Manage Studio Accordion (super admin only, collapsed) ── */}
       {orgId && (
         <ManageStudioAccordion
           orgData={orgData}

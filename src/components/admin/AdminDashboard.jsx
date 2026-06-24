@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { AlertCircle, Check, Calendar, User as UserIcon, Sparkles } from 'lucide-react';
+import { AlertCircle, Check, Calendar, User as UserIcon, Sparkles, HelpCircle } from 'lucide-react';
 import { clsx } from 'clsx';
 import { db, coll } from '../../firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -16,7 +16,7 @@ export default function AdminDashboard({
   currentAct, updateActNumber, toggleTracking,
   selectedShow, setSelectedShow,
 }) {
-  const { isSuperAdmin, orgId } = useApp();
+  const { isSuperAdmin, orgId, openTutorial } = useApp();
 
   const [activeAdminTab, setActiveAdminTab] = useState('workspace');
   const [showNightMode, setShowNightMode] = useState(false);
@@ -25,7 +25,7 @@ export default function AdminDashboard({
   const [promptModal, setPromptModal] = useState(null);
   const [orgData, setOrgData] = useState({ name: '', admins: [] });
 
-  // Shared state lifted for ShowsTab â†” AdminDashboard (LiveShowController needs editData)
+  // Shared state lifted for ShowsTab ↔ AdminDashboard (LiveShowController needs editData)
   const [selectedShowId, setSelectedShowId] = useState('');
   const [editData, setEditData] = useState(null);
 
@@ -99,23 +99,33 @@ export default function AdminDashboard({
         onCancel={() => setPromptModal(null)}
       />
 
-      {/* Tab Navigation */}
-      <div className="flex gap-1.5 p-1.5 bg-ink-100 dark:bg-ink-800 rounded-card overflow-x-auto">
-        {tabs.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveAdminTab(tab.key)}
-            className={clsx(
-              "flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-card font-bold text-sm transition-all whitespace-nowrap",
-              activeAdminTab === tab.key
-                ? "bg-white dark:bg-ink-700 text-brand-600 shadow-sm"
-                : "text-ink-400 hover:text-ink-600 dark:hover:text-ink-300"
-            )}
-          >
-            {tab.icon}
-            <span className="hidden sm:inline">{tab.label}</span>
-          </button>
-        ))}
+      {/* Tab Navigation + admin help */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 flex gap-1.5 p-1.5 bg-ink-100 dark:bg-ink-800 rounded-card overflow-x-auto">
+          {tabs.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveAdminTab(tab.key)}
+              className={clsx(
+                "flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-card font-bold text-sm transition-all whitespace-nowrap",
+                activeAdminTab === tab.key
+                  ? "bg-white dark:bg-ink-700 text-brand-600 shadow-sm"
+                  : "text-ink-400 hover:text-ink-600 dark:hover:text-ink-300"
+              )}
+            >
+              {tab.icon}
+              <span className="hidden sm:inline">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => openTutorial('admin')}
+          title="How to use the admin console"
+          aria-label="How to use the admin console"
+          className="shrink-0 w-11 h-11 flex items-center justify-center rounded-card bg-ink-100 dark:bg-ink-800 text-ink-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors"
+        >
+          <HelpCircle size={20} />
+        </button>
       </div>
 
       {activeAdminTab === 'workspace' && (
