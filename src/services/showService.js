@@ -5,6 +5,10 @@ import {
   where, writeBatch
 } from 'firebase/firestore';
 
+// Normalize an act title for matching across a CSV re-upload (case- and
+// whitespace-insensitive) so trivial formatting differences don't orphan notes.
+const normalizeTitle = (title) => (title || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
 // ── Favorites ────────────────────────────────────────────────────────
 
 /**
@@ -89,10 +93,33 @@ export async function createShow(orgId, id, label) {
  * Returns the saved acts (number/title/performers only).
  */
 export async function uploadActsForShow(showId, validatedActs) {
-  // Assign stable ids once so the persisted doc and the returned (local-state)
-  // act share the same id.
-  const actsWithIds = validatedActs.map(act => ({ ...act, id: act.id || newActId() }));
   const existing = await getDocs(query(collection(db, coll('acts')), where('show_id', '==', showId)));
+
+  // Preserve each dance's stable id across re-upload so private notes (keyed on
+  // act.id) stay attached. The CSV carries no ids, so match incoming acts to the
+  // acts currently saved by title. Matching by title — not number — keeps a note
+  // with its dance through reordering/renumbering, and correctly orphans the note
+  // when a dance is *replaced* (a number-based match would misattach it to the
+  // new dance). Duplicate titles are consumed in number order. Acts whose title
+  // has no match (new or renamed dances) get a fresh id.
+  const titleQueues = new Map();
+  existing.docs
+    .map(d => d.data())
+    .filter(a => a.id)
+    .sort((a, b) => (a.number || 0) - (b.number || 0))
+    .forEach(a => {
+      const key = normalizeTitle(a.title);
+      if (!titleQueues.has(key)) titleQueues.set(key, []);
+      titleQueues.get(key).push(a.id);
+    });
+
+  const actsWithIds = validatedActs.map(act => {
+    if (act.id) return act;
+    const queue = titleQueues.get(normalizeTitle(act.title));
+    const preservedId = queue && queue.length ? queue.shift() : null;
+    return { ...act, id: preservedId || newActId() };
+  });
+
   const batch = writeBatch(db);
   existing.docs.forEach(d => batch.delete(d.ref));
   actsWithIds.forEach(act => {
