@@ -24,6 +24,7 @@ import StudioSelector from './components/StudioSelector';
 import ShowSelector from './components/ui/ShowSelector';
 import FloatingButtons from './components/ui/FloatingButtons';
 import LoginPromptModal from './components/ui/LoginPromptModal';
+import SyncPromptModal from './components/ui/SyncPromptModal';
 import TutorialOverlay from './components/ui/TutorialOverlay';
 
 // Helper component
@@ -49,6 +50,7 @@ export default function App() {
     favorites, toggleFavorite,
     orgId, setOrgId, orgName, orgResolveAttempted,
     loginPromptOpen, setLoginPromptOpen,
+    syncPromptOpen, confirmSync, dismissSync, syncPromptCounts,
   } = useApp();
 
   // 2. Initialize show locally from URL (for deep links)
@@ -336,6 +338,14 @@ export default function App() {
         isOpen={loginPromptOpen}
         onClose={() => setLoginPromptOpen(false)}
         onGoToSettings={() => { setLoginPromptOpen(false); navigate('/settings'); }}
+      />
+
+      {/* --- DEVICE → ACCOUNT SYNC PROMPT (on login with local data) --- */}
+      <SyncPromptModal
+        isOpen={syncPromptOpen}
+        counts={syncPromptCounts}
+        onSync={confirmSync}
+        onKeepSeparate={dismissSync}
       />
 
       {/* --- FIRST-RUN "HOW TO USE" TUTORIAL --- */}

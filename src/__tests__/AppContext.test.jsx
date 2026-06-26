@@ -255,7 +255,7 @@ describe('AppContext.toggleFavorite', () => {
     setDoc.mockResolvedValue(undefined);
   });
 
-  it('opens loginPrompt and returns false when no user is logged in', async () => {
+  it('saves favorites locally (not to Firestore) when no user is logged in', async () => {
     let captured;
     renderWithProvider(ctx => { captured = ctx; });
 
@@ -268,8 +268,111 @@ describe('AppContext.toggleFavorite', () => {
       result = await captured.toggleFavorite('Alice');
     });
 
-    expect(result).toBe(false);
-    expect(captured.loginPromptOpen).toBe(true);
+    expect(result).toBe(true);
+    expect(captured.loginPromptOpen).toBe(false);
+    expect(captured.favorites.has('Alice')).toBe(true);
+    expect(JSON.parse(localStorage.getItem('guestFavorites'))).toEqual(['Alice']);
+    expect(setDoc).not.toHaveBeenCalled();
+  });
+
+  it('seeds favorites from guest localStorage on a logged-out load', async () => {
+    localStorage.setItem('guestFavorites', JSON.stringify(['Bob']));
+
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(null);
+    });
+
+    expect(captured.favorites.has('Bob')).toBe(true);
+  });
+
+  it('prompts to sync (without auto-merging) when logging in with guest data', async () => {
+    localStorage.setItem('guestFavorites', JSON.stringify(['Bob']));
+    localStorage.setItem('guestDancerNotes', JSON.stringify({ 's::1::Bob': 'red tutu' }));
+    getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ favorites: ['Alice'], dancerNotes: { 's::2::Alice': 'bow' } }),
+    });
+
+    const mockUser = { uid: 'u11', email: 'fan@example.com' };
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(mockUser);
+    });
+
+    // Account data loads; guest data is NOT merged yet — the prompt is shown.
+    expect(captured.syncPromptOpen).toBe(true);
+    expect(captured.syncPromptCounts).toEqual({ favorites: 1, notes: 1 });
+    expect(captured.favorites.has('Alice')).toBe(true);
+    expect(captured.favorites.has('Bob')).toBe(false);
+    expect(localStorage.getItem('guestFavorites')).not.toBeNull();
+  });
+
+  it('confirmSync merges guest data into the profile and clears local storage', async () => {
+    localStorage.setItem('guestFavorites', JSON.stringify(['Bob']));
+    localStorage.setItem('guestDancerNotes', JSON.stringify({ 's::1::Bob': 'red tutu' }));
+    getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ favorites: ['Alice'], dancerNotes: { 's::2::Alice': 'bow' } }),
+    });
+
+    const mockUser = { uid: 'u12', email: 'fan@example.com' };
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(mockUser);
+    });
+
+    setDoc.mockClear();
+    await act(async () => {
+      await captured.confirmSync();
+    });
+
+    expect(captured.syncPromptOpen).toBe(false);
+    expect(captured.favorites.has('Alice')).toBe(true);
+    expect(captured.favorites.has('Bob')).toBe(true);
+    expect(captured.dancerNotes['s::1::Bob']).toBe('red tutu');
+    expect(captured.dancerNotes['s::2::Alice']).toBe('bow');
+    await waitFor(() => {
+      expect(setDoc).toHaveBeenCalledWith(
+        { type: 'docRef' },
+        expect.objectContaining({ favorites: expect.arrayContaining(['Alice', 'Bob']) }),
+        { merge: true }
+      );
+    });
+    expect(localStorage.getItem('guestFavorites')).toBeNull();
+    expect(localStorage.getItem('guestDancerNotes')).toBeNull();
+  });
+
+  it('dismissSync keeps account data unchanged and retains guest storage', async () => {
+    localStorage.setItem('guestFavorites', JSON.stringify(['Bob']));
+    getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ favorites: ['Alice'] }),
+    });
+
+    const mockUser = { uid: 'u13', email: 'fan@example.com' };
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => {
+      authCallback(mockUser);
+    });
+
+    await act(async () => {
+      captured.dismissSync();
+    });
+
+    expect(captured.syncPromptOpen).toBe(false);
+    expect(captured.favorites.has('Alice')).toBe(true);
+    expect(captured.favorites.has('Bob')).toBe(false);
+    // Guest data is left on the device for the next logged-out session.
+    expect(JSON.parse(localStorage.getItem('guestFavorites'))).toEqual(['Bob']);
   });
 
   it('adds a dancer to favorites when not already present', async () => {

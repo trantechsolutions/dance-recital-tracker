@@ -6,6 +6,45 @@ import { MULTI_STUDIO_ENABLED, DEFAULT_ORG_ID } from '../config';
 
 const AppContext = createContext();
 
+// --- Guest (logged-out) local persistence ---
+// Favorites and per-act dancer notes are saved to localStorage while browsing
+// without an account, then merged into the user's profile on login.
+const GUEST_FAVORITES_KEY = 'guestFavorites';
+const GUEST_NOTES_KEY = 'guestDancerNotes';
+
+const loadGuestFavorites = () => {
+  try {
+    const raw = localStorage.getItem(GUEST_FAVORITES_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+};
+const saveGuestFavorites = (set) => {
+  try {
+    localStorage.setItem(GUEST_FAVORITES_KEY, JSON.stringify(Array.from(set)));
+  } catch { /* storage unavailable (private mode / quota) — non-fatal */ }
+};
+const loadGuestNotes = () => {
+  try {
+    const raw = localStorage.getItem(GUEST_NOTES_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+const saveGuestNotes = (obj) => {
+  try {
+    localStorage.setItem(GUEST_NOTES_KEY, JSON.stringify(obj));
+  } catch { /* storage unavailable — non-fatal */ }
+};
+const clearGuestData = () => {
+  try {
+    localStorage.removeItem(GUEST_FAVORITES_KEY);
+    localStorage.removeItem(GUEST_NOTES_KEY);
+  } catch { /* storage unavailable — non-fatal */ }
+};
+
 export function AppProvider({ children }) {
   // --- Global State ---
   const [user, setUser] = useState(null);
@@ -16,10 +55,13 @@ export function AppProvider({ children }) {
   const isAuthorized = useMemo(() => isSuperAdmin || isStudioAdmin, [isSuperAdmin, isStudioAdmin]);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [hasSkippedLogin, setHasSkippedLogin] = useState(() => localStorage.getItem('hasSkippedLogin') === 'true');
-  const [favorites, setFavorites] = useState(new Set());
+  // Seed from any guest data saved while logged out; replaced on login with the
+  // merged profile, restored to guest data on logout.
+  const [favorites, setFavorites] = useState(() => loadGuestFavorites());
   // Private per-dancer-per-act notes (outfit/hairstyle, etc.), keyed by
-  // `${showId}::${actNumber}::${dancer}`. Stored on the user's own profile.
-  const [dancerNotes, setDancerNotes] = useState({});
+  // `${showId}::${actNumber}::${dancer}`. Stored on the user's own profile when
+  // logged in, or in localStorage as a guest.
+  const [dancerNotes, setDancerNotes] = useState(() => loadGuestNotes());
   const [orgId, setOrgId] = useState(() => {
     // Single-studio mode: a configured default org is authoritative (overrides
     // any stale localStorage value from a prior multi-studio session).
@@ -34,6 +76,12 @@ export function AppProvider({ children }) {
   const invalidDefaultOrg = useRef(false);
   const [orgName, setOrgName] = useState('');
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
+  // Login-time prompt offering to merge device-local (guest) favorites/notes
+  // into the account. pendingGuestData holds the captured guest data; the ref
+  // ensures we only ask once per logged-in session.
+  const [syncPromptOpen, setSyncPromptOpen] = useState(false);
+  const [pendingGuestData, setPendingGuestData] = useState(null);
+  const syncResolvedRef = useRef(false);
   // "How to use" tutorial. The 'general' variant is the user-facing tour that
   // auto-opens once on first run (tracked in localStorage); the 'admin' variant
   // is launched on demand from the admin panel's help (?) button and explains
@@ -61,8 +109,13 @@ export function AppProvider({ children }) {
           setUser(null);
           setIsSuperAdmin(false);
           setIsStudioAdmin(false);
-          setFavorites(new Set());
-          setDancerNotes({});
+          // Fall back to whatever was saved while browsing as a guest.
+          setFavorites(loadGuestFavorites());
+          setDancerNotes(loadGuestNotes());
+          // Allow the sync prompt to fire again on the next login.
+          syncResolvedRef.current = false;
+          setSyncPromptOpen(false);
+          setPendingGuestData(null);
         }
       } catch (err) {
         console.error("[Auth] onAuthStateChanged error:", err);
@@ -86,24 +139,69 @@ export function AppProvider({ children }) {
     const isSuper = u && authorizedUsers.includes(u.email);
     setIsSuperAdmin(isSuper);
 
-    // Fetch user profile & favorites
+    // Fetch user profile & favorites — the account is the source of truth on
+    // login; device-local guest data is only merged in if the user opts to.
     const profileRef = doc(db, coll('user_profiles'), u.uid);
     const profileSnap = await getDoc(profileRef);
-
-    if (profileSnap.exists()) {
-      const data = profileSnap.data();
-      setFavorites(new Set(data.favorites || []));
-      setDancerNotes(data.dancerNotes || {});
-    } else {
-      setFavorites(new Set());
-      setDancerNotes({});
-    }
+    const data = profileSnap.exists() ? profileSnap.data() : {};
+    setFavorites(new Set(data.favorites || []));
+    setDancerNotes(data.dancerNotes || {});
 
     // Upsert user profile with login timestamp
     await setDoc(profileRef, {
       email: u.email,
       last_login: new Date().toISOString()
     }, { merge: true });
+
+    // Offer to merge anything saved while browsing as a guest. Resolved once per
+    // session (Sync or Keep separate) so a re-fired auth event won't re-ask.
+    if (!syncResolvedRef.current) {
+      const guestFavorites = loadGuestFavorites();
+      const guestNotes = loadGuestNotes();
+      if (guestFavorites.size > 0 || Object.keys(guestNotes).length > 0) {
+        setPendingGuestData({ favorites: guestFavorites, notes: guestNotes });
+        setSyncPromptOpen(true);
+      }
+    }
+  };
+
+  // Merge the pending device-local data into the logged-in account: favorites
+  // are unioned, notes take the device value on a key conflict (it's the most
+  // recently typed). Optimistic with rollback, then clears local guest storage.
+  const confirmSync = async () => {
+    syncResolvedRef.current = true;
+    setSyncPromptOpen(false);
+    const pending = pendingGuestData;
+    setPendingGuestData(null);
+    if (!user || !pending) return;
+
+    const prevFavorites = favorites;
+    const prevNotes = dancerNotes;
+    const mergedFavorites = new Set([...prevFavorites, ...pending.favorites]);
+    const mergedNotes = { ...prevNotes, ...pending.notes };
+    setFavorites(mergedFavorites);
+    setDancerNotes(mergedNotes);
+
+    try {
+      const profileRef = doc(db, coll('user_profiles'), user.uid);
+      await setDoc(profileRef, {
+        favorites: Array.from(mergedFavorites),
+        dancerNotes: mergedNotes,
+      }, { merge: true });
+      clearGuestData();
+    } catch {
+      // Write failed — roll back state and keep guest data so it can be retried.
+      setFavorites(prevFavorites);
+      setDancerNotes(prevNotes);
+    }
+  };
+
+  // Decline the merge. Account data stays as-is; guest data is left in
+  // localStorage so it reappears when browsing logged out again.
+  const dismissSync = () => {
+    syncResolvedRef.current = true;
+    setSyncPromptOpen(false);
+    setPendingGuestData(null);
   };
 
   // --- Org ID Sync ---
@@ -178,9 +276,17 @@ export function AppProvider({ children }) {
 
   // --- Actions ---
   const toggleFavorite = async (name) => {
+    // Logged out: persist to localStorage so favorites survive a reload and can
+    // be merged into the account on login.
     if (!user) {
-      setLoginPromptOpen(true);
-      return false;
+      setFavorites(prev => {
+        const next = new Set(prev);
+        if (next.has(name)) next.delete(name);
+        else next.add(name);
+        saveGuestFavorites(next);
+        return next;
+      });
+      return true;
     }
 
     // Capture previous state for rollback
@@ -207,11 +313,20 @@ export function AppProvider({ children }) {
   // a setDoc merge would deep-merge and leave stale keys behind. Optimistic
   // with rollback, mirroring toggleFavorite.
   const setDancerNote = async (key, text) => {
-    if (!user) {
-      setLoginPromptOpen(true);
-      return false;
-    }
     const trimmed = (text || '').trim().slice(0, 500);
+
+    // Logged out: persist to localStorage, merged into the account on login.
+    if (!user) {
+      setDancerNotes(prev => {
+        const next = { ...prev };
+        if (trimmed) next[key] = trimmed;
+        else delete next[key];
+        saveGuestNotes(next);
+        return next;
+      });
+      return true;
+    }
+
     setDancerNotes(prev => {
       const next = { ...prev };
       if (trimmed) next[key] = trimmed;
@@ -275,6 +390,11 @@ export function AppProvider({ children }) {
     dancerNotes, setDancerNote,
     orgId, setOrgId, orgName, setOrgName, orgResolveAttempted,
     loginPromptOpen, setLoginPromptOpen,
+    syncPromptOpen, confirmSync, dismissSync,
+    syncPromptCounts: {
+      favorites: pendingGuestData ? pendingGuestData.favorites.size : 0,
+      notes: pendingGuestData ? Object.keys(pendingGuestData.notes).length : 0,
+    },
     showTutorial, tutorialVariant, openTutorial, dismissTutorial, resetTutorial, tutorialNeverSeen,
   };
 
