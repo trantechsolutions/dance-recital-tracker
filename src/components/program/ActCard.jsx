@@ -1,9 +1,7 @@
 import React from 'react';
-import { Star, ChevronRight, Lock } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Star, ChevronRight } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useApp } from '../../context/AppContext';
-import { lastInitial } from '../../utils/names';
 
 export default function ActCard({ act, isCurrent, toggleFavorite, favorites, onClick, showId }) {
   const { user } = useApp();
@@ -31,7 +29,7 @@ export default function ActCard({ act, isCurrent, toggleFavorite, favorites, onC
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-500" />
       )}
 
-      <div className="px-4 py-4 sm:px-5 sm:py-5 flex items-start gap-4">
+      <div className="px-4 py-4 sm:px-5 sm:py-5 flex items-center gap-4">
         {/* Act number badge — display serif numeral */}
         <div className={clsx(
           "w-12 h-12 rounded-card flex items-center justify-center font-display text-2xl shrink-0 transition-colors leading-none",
@@ -45,7 +43,7 @@ export default function ActCard({ act, isCurrent, toggleFavorite, favorites, onC
         </div>
 
         {/* Title + performers */}
-        <div className="flex-1 min-w-0 pt-0.5">
+        <div className="flex-1 min-w-0">
           <p className={clsx(
             "font-display text-lg sm:text-xl font-medium italic leading-snug",
             isCurrent ? "text-brand-900 dark:text-brand-100" : isHighlighted ? "text-brand-800 dark:text-brand-200" : "text-ink-900 dark:text-white"
@@ -53,42 +51,7 @@ export default function ActCard({ act, isCurrent, toggleFavorite, favorites, onC
             {act.title}
           </p>
 
-          {act.performers?.length > 0 && (
-            user ? (
-              <p className={clsx(
-                "text-sm mt-1.5 leading-snug line-clamp-2",
-                isCurrent ? "text-brand-700 dark:text-brand-300" : "text-ink-500 dark:text-ink-400"
-              )}>
-                {act.performers.map((p, i) => {
-                  const isDancerFav = favorites?.has(p);
-                  return (
-                    <span
-                      key={i}
-                      className={clsx(
-                        isDancerFav && !isCurrent && "text-brand-700 dark:text-brand-300 font-semibold",
-                        isDancerFav && isCurrent && "font-bold"
-                      )}
-                    >
-                      {lastInitial(p)}{i < act.performers.length - 1 ? ', ' : ''}
-                    </span>
-                  );
-                })}
-              </p>
-            ) : (
-              <Link
-                to="/settings"
-                onClick={(e) => e.stopPropagation()}
-                className={clsx(
-                  "inline-flex items-center gap-1 text-xs mt-1.5 font-semibold transition-colors hover:underline",
-                  isCurrent ? "text-brand-700 dark:text-brand-300" : "text-ink-400 hover:text-brand-600"
-                )}
-              >
-                <Lock size={11} /> Sign in to view dancers
-              </Link>
-            )
-          )}
-
-          {act.performers?.length > 0 && (
+          {user && act.performers?.length > 0 && (
             <span className={clsx(
               "inline-flex items-center mt-2 text-xs font-medium",
               isCurrent ? "text-brand-500 dark:text-brand-400" : "text-ink-400"
@@ -99,7 +62,7 @@ export default function ActCard({ act, isCurrent, toggleFavorite, favorites, onC
         </div>
 
         {/* Actions */}
-        <div className="flex flex-col items-center gap-1.5 shrink-0">
+        <div className="relative flex items-center shrink-0">
           <button
             onClick={(e) => { e.stopPropagation(); toggleFavorite(actKey); }}
             aria-label={isActFav ? 'Remove from favorites' : 'Add to favorites'}
@@ -116,7 +79,7 @@ export default function ActCard({ act, isCurrent, toggleFavorite, favorites, onC
           </button>
           {onClick && (
             <ChevronRight size={15} className={clsx(
-              "hidden sm:block transition-all opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0",
+              "hidden sm:block absolute left-full top-1/2 -translate-y-1/2 transition-all opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0",
               isCurrent ? "text-brand-400" : "text-ink-300"
             )} />
           )}

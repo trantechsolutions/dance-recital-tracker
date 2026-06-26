@@ -107,7 +107,7 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
           {act.performers?.length > 0 && (
             <div>
               <h3 className="text-[10px] font-semibold uppercase text-ink-400 tracking-widest mb-2 px-0.5">
-                Performers ({act.performers.length})
+                Performers{user ? ` (${act.performers.length})` : ''}
               </h3>
               {!user ? (
                 <Link
