@@ -3,10 +3,10 @@ import { X, Star, Heart, Share2, Music, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { useApp } from '../../context/AppContext';
-import { lastInitial } from '../../utils/names';
+import { displayName } from '../../utils/names';
 
 export default function ActDetailModal({ act, isOpen, onClose, favorites, toggleFavorite, isCurrent, showId }) {
-  const { user } = useApp();
+  const { user, canViewFullNames } = useApp();
   const closeButtonRef = useRef(null);
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
 
   const handleShare = async () => {
     const performerLine = user
-      ? (act.performers?.map(lastInitial).join(', ') || 'N/A')
+      ? (act.performers?.map((p) => displayName(p, canViewFullNames)).join(', ') || 'N/A')
       : 'Sign in to view';
     const text = `Act #${act.number}: ${act.title}\nPerformers: ${performerLine}`;
     if (navigator.share) {
@@ -150,7 +150,7 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
                           "font-bold text-sm",
                           isDancerFav ? "text-brand-600 dark:text-brand-400" : "dark:text-white"
                         )}>
-                          {lastInitial(performer)}
+                          {displayName(performer, canViewFullNames)}
                         </span>
                       </div>
                       <button

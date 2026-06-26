@@ -14,3 +14,11 @@ export function lastInitial(name) {
   const last = parts[parts.length - 1];
   return `${parts.slice(0, -1).join(' ')} ${last.charAt(0).toUpperCase()}.`;
 }
+
+// Render a performer name according to the viewer's privilege: `full` viewers
+// (super/studio admins or allowlisted emails) see the raw stored name; everyone
+// else sees the last-initial form.
+export function displayName(name, full) {
+  if (full) return typeof name === 'string' ? name.trim() : '';
+  return lastInitial(name);
+}

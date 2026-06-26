@@ -3,10 +3,10 @@ import { Star, Search as SearchIcon, Cloud, Share2, Check, Heart, Hash, Lock } f
 import { useSearchParams, Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { clsx } from 'clsx';
-import { lastInitial } from '../../utils/names';
+import { displayName } from '../../utils/names';
 
 export default function SearchDancerView({ showData, selectedShow, favorites, toggleFavorite, user }) {
-  const { orgId } = useApp();
+  const { orgId, canViewFullNames } = useApp();
   const [searchParams] = useSearchParams();
   const [inputValue, setInputValue] = useState(() => searchParams.get('q') || '');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
@@ -120,7 +120,7 @@ export default function SearchDancerView({ showData, selectedShow, favorites, to
             </div>
             <div className="min-w-0">
               <div className={clsx("font-bold text-sm truncate", isFav ? "text-brand-600 dark:text-brand-400" : "dark:text-white")}>
-                {lastInitial(res.name)}
+                {displayName(res.name, canViewFullNames)}
               </div>
               <div className="text-[10px] font-bold text-ink-400">{res.acts.length} act{res.acts.length !== 1 ? 's' : ''}</div>
             </div>

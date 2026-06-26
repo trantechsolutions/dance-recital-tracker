@@ -3,6 +3,7 @@ import { auth, db, authorizedUsers, coll } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
 import { MULTI_STUDIO_ENABLED, DEFAULT_ORG_ID } from '../config';
+import { subscribeNameAccess } from '../services/nameAccessService';
 
 const AppContext = createContext();
 
@@ -59,6 +60,18 @@ export function AppProvider({ children }) {
 
   // Derived — no independent state; eliminates the dual-writer race
   const isAuthorized = useMemo(() => isSuperAdmin || isStudioAdmin, [isSuperAdmin, isStudioAdmin]);
+
+  // Super-admin-managed allowlist of emails permitted to see full (non-redacted)
+  // performer names. Watched live so grants/revokes take effect without reload.
+  const [nameAccessEmails, setNameAccessEmails] = useState([]);
+
+  // A viewer sees full names if they're an admin (super or studio) or their
+  // email is on the allowlist. Everyone else — including logged-out guests —
+  // sees the last-initial form.
+  const canViewFullNames = useMemo(
+    () => !!user && (isSuperAdmin || isStudioAdmin || nameAccessEmails.includes((user.email || '').toLowerCase())),
+    [user, isSuperAdmin, isStudioAdmin, nameAccessEmails]
+  );
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [hasSkippedLogin, setHasSkippedLogin] = useState(() => localStorage.getItem('hasSkippedLogin') === 'true');
   // Seed from any guest data saved while logged out; replaced on login with the
@@ -145,6 +158,19 @@ export function AppProvider({ children }) {
       unsubscribe();
     };
   }, []);
+
+  // Watch the full-name allowlist in real time, but only while signed in —
+  // guests can never see full names anyway, and skipping the read keeps the doc
+  // locked down to authenticated users in Firestore rules. Errors (e.g.
+  // permission) fall back to an empty list, keeping everyone on the redacted view.
+  useEffect(() => {
+    if (!user) { setNameAccessEmails([]); return; }
+    const unsubscribe = subscribeNameAccess(
+      (emails) => setNameAccessEmails(emails),
+      (err) => console.warn('[NameAccess] subscription error:', err?.message || err)
+    );
+    return () => unsubscribe();
+  }, [user]);
 
   const handleUserLogin = async (u) => {
     setUser(u);
@@ -421,6 +447,7 @@ export function AppProvider({ children }) {
 
   const value = {
     user, isAuthorized, isSuperAdmin, isStudioAdmin, isAuthChecking,
+    canViewFullNames, nameAccessEmails,
     hasSkippedLogin, skipLogin, clearSkipLogin,
     favorites, toggleFavorite,
     dancerNotes, setDancerNote,

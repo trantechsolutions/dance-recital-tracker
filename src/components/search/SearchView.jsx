@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { clsx } from 'clsx';
 import ActCard from '../program/ActCard';
 import ActDetailModal from '../program/ActDetailModal';
-import { lastInitial } from '../../utils/names';
+import { displayName } from '../../utils/names';
 
 export default function SearchView({ showData, selectedShow, favorites, currentAct, toggleFavorite, user, showId }) {
   const { orgId } = useApp();
@@ -255,6 +255,7 @@ function ActsPanel({ searchQuery, actResults, favoriteActs, currentAct, toggleFa
 }
 
 function DancerCard({ res, favorites, toggleFavorite }) {
+  const { canViewFullNames } = useApp();
   const isFav = favorites?.has(res.name);
   return (
     <div className={clsx(
@@ -273,7 +274,7 @@ function DancerCard({ res, favorites, toggleFavorite }) {
           </div>
           <div className="min-w-0">
             <div className={clsx("font-bold text-sm truncate", isFav ? "text-brand-600 dark:text-brand-400" : "dark:text-white")}>
-              {lastInitial(res.name)}
+              {displayName(res.name, canViewFullNames)}
             </div>
             <div className="text-[10px] font-bold text-ink-400">{res.acts.length} act{res.acts.length !== 1 ? 's' : ''}</div>
           </div>
