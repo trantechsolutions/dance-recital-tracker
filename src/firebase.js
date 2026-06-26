@@ -17,7 +17,11 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 export const authorizedUsers = (import.meta.env.VITE_AUTHORIZED_ADMINS || "").split(',');
-export const DB_PREFIX = import.meta.env.DEV ? 'test_' : '';
+// Resolved at build time in vite.config.js (resolveDbPrefix): 'test_' for local
+// dev and non-production deploys (e.g. the develop/preview branch), '' for the
+// production deploy. The `?? (DEV ? 'test_' : '')` is a safety fallback for any
+// path that doesn't go through the build define.
+export const DB_PREFIX = import.meta.env.VITE_DB_PREFIX ?? (import.meta.env.DEV ? 'test_' : '');
 
 // Prefix every Firestore collection name so dev/test data (DB_PREFIX='test_')
 // never commingles with production data (DB_PREFIX=''). ALWAYS route collection
