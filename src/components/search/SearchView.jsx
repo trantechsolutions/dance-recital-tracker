@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { Search as SearchIcon, Cloud, Share2, Check, Music, Heart, Hash, Star } from 'lucide-react';
+import { Search as SearchIcon, Cloud, Share2, Check, Music, Heart, Hash, Star, Lock } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { clsx } from 'clsx';
 import ActCard from '../program/ActCard';
 import ActDetailModal from '../program/ActDetailModal';
+import { lastInitial } from '../../utils/names';
 
 export default function SearchView({ showData, selectedShow, favorites, currentAct, toggleFavorite, user, showId }) {
   const { orgId } = useApp();
@@ -271,7 +273,7 @@ function DancerCard({ res, favorites, toggleFavorite }) {
           </div>
           <div className="min-w-0">
             <div className={clsx("font-bold text-sm truncate", isFav ? "text-brand-600 dark:text-brand-400" : "dark:text-white")}>
-              {res.name}
+              {lastInitial(res.name)}
             </div>
             <div className="text-[10px] font-bold text-ink-400">{res.acts.length} act{res.acts.length !== 1 ? 's' : ''}</div>
           </div>
@@ -304,6 +306,30 @@ function DancerCard({ res, favorites, toggleFavorite }) {
 }
 
 function DancersPanel({ searchQuery, dancerResults, favoriteDancers, favorites, toggleFavorite, user }) {
+  // Dancer names are hidden from logged-out visitors to protect performers'
+  // privacy — searching by name requires an account.
+  if (!user) {
+    return (
+      <div className="text-center py-12 bg-white dark:bg-ink-800 rounded-card border border-ink-100 dark:border-ink-700 space-y-4">
+        <div className="w-16 h-16 bg-brand-50 dark:bg-brand-900/20 rounded-full flex items-center justify-center mx-auto">
+          <Lock size={28} className="text-brand-400 dark:text-brand-600" />
+        </div>
+        <div>
+          <h3 className="text-base font-semibold dark:text-white mb-1">Sign in to search dancers</h3>
+          <p className="text-ink-400 text-sm max-w-sm mx-auto px-4">
+            Dancer names are hidden to protect performers' privacy. Sign in to search and favorite dancers.
+          </p>
+        </div>
+        <Link
+          to="/settings"
+          className="inline-flex items-center gap-2 px-5 py-3 bg-brand-600 text-white rounded-card font-bold text-sm shadow-lg shadow-brand-500/20 hover:bg-brand-700 transition-colors"
+        >
+          <Lock size={16} /> Sign In
+        </Link>
+      </div>
+    );
+  }
+
   if (searchQuery) {
     if (dancerResults.length > 0) {
       return (

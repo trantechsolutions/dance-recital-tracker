@@ -1,8 +1,12 @@
 import React from 'react';
-import { Star, ChevronRight } from 'lucide-react';
+import { Star, ChevronRight, Lock } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { clsx } from 'clsx';
+import { useApp } from '../../context/AppContext';
+import { lastInitial } from '../../utils/names';
 
 export default function ActCard({ act, isCurrent, toggleFavorite, favorites, onClick, showId }) {
+  const { user } = useApp();
   const actKey = showId ? `act-${showId}-${act.number}` : `act-${act.number}`;
   const isActFav = favorites?.has(actKey);
   const hasFavDancer = act.performers?.some(p => favorites?.has(p));
@@ -50,25 +54,38 @@ export default function ActCard({ act, isCurrent, toggleFavorite, favorites, onC
           </p>
 
           {act.performers?.length > 0 && (
-            <p className={clsx(
-              "text-sm mt-1.5 leading-snug line-clamp-2",
-              isCurrent ? "text-brand-700 dark:text-brand-300" : "text-ink-500 dark:text-ink-400"
-            )}>
-              {act.performers.map((p, i) => {
-                const isDancerFav = favorites?.has(p);
-                return (
-                  <span
-                    key={i}
-                    className={clsx(
-                      isDancerFav && !isCurrent && "text-brand-700 dark:text-brand-300 font-semibold",
-                      isDancerFav && isCurrent && "font-bold"
-                    )}
-                  >
-                    {p}{i < act.performers.length - 1 ? ', ' : ''}
-                  </span>
-                );
-              })}
-            </p>
+            user ? (
+              <p className={clsx(
+                "text-sm mt-1.5 leading-snug line-clamp-2",
+                isCurrent ? "text-brand-700 dark:text-brand-300" : "text-ink-500 dark:text-ink-400"
+              )}>
+                {act.performers.map((p, i) => {
+                  const isDancerFav = favorites?.has(p);
+                  return (
+                    <span
+                      key={i}
+                      className={clsx(
+                        isDancerFav && !isCurrent && "text-brand-700 dark:text-brand-300 font-semibold",
+                        isDancerFav && isCurrent && "font-bold"
+                      )}
+                    >
+                      {lastInitial(p)}{i < act.performers.length - 1 ? ', ' : ''}
+                    </span>
+                  );
+                })}
+              </p>
+            ) : (
+              <Link
+                to="/settings"
+                onClick={(e) => e.stopPropagation()}
+                className={clsx(
+                  "inline-flex items-center gap-1 text-xs mt-1.5 font-semibold transition-colors hover:underline",
+                  isCurrent ? "text-brand-700 dark:text-brand-300" : "text-ink-400 hover:text-brand-600"
+                )}
+              >
+                <Lock size={11} /> Sign in to view dancers
+              </Link>
+            )
           )}
 
           {act.performers?.length > 0 && (
