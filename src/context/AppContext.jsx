@@ -11,6 +11,12 @@ const AppContext = createContext();
 // without an account, then merged into the user's profile on login.
 const GUEST_FAVORITES_KEY = 'guestFavorites';
 const GUEST_NOTES_KEY = 'guestDancerNotes';
+// Set when the user opts out of the on-login sync prompt ("Don't ask again").
+// The manual Sync button in My Schedule ignores this and re-opens the prompt.
+const SYNC_DISMISSED_KEY = 'syncPromptDismissed';
+
+const hasGuestData = () =>
+  loadGuestFavorites().size > 0 || Object.keys(loadGuestNotes()).length > 0;
 
 const loadGuestFavorites = () => {
   try {
@@ -81,7 +87,13 @@ export function AppProvider({ children }) {
   // ensures we only ask once per logged-in session.
   const [syncPromptOpen, setSyncPromptOpen] = useState(false);
   const [pendingGuestData, setPendingGuestData] = useState(null);
+  // Manual opens (from the My Schedule button) hide the "Don't ask again" option,
+  // which only governs the automatic on-login prompt.
+  const [syncPromptManual, setSyncPromptManual] = useState(false);
   const syncResolvedRef = useRef(false);
+  // Whether device-local guest data exists right now — drives the My Schedule
+  // "Sync" button visibility. Recomputed whenever guest storage changes.
+  const [guestDataPresent, setGuestDataPresent] = useState(() => hasGuestData());
   // "How to use" tutorial. The 'general' variant is the user-facing tour that
   // auto-opens once on first run (tracked in localStorage); the 'admin' variant
   // is launched on demand from the admin panel's help (?) button and explains
@@ -154,15 +166,29 @@ export function AppProvider({ children }) {
     }, { merge: true });
 
     // Offer to merge anything saved while browsing as a guest. Resolved once per
-    // session (Sync or Keep separate) so a re-fired auth event won't re-ask.
-    if (!syncResolvedRef.current) {
-      const guestFavorites = loadGuestFavorites();
-      const guestNotes = loadGuestNotes();
-      if (guestFavorites.size > 0 || Object.keys(guestNotes).length > 0) {
-        setPendingGuestData({ favorites: guestFavorites, notes: guestNotes });
-        setSyncPromptOpen(true);
-      }
+    // session (Sync or Keep separate) so a re-fired auth event won't re-ask, and
+    // suppressed entirely once the user has chosen "Don't ask again".
+    const guestFavorites = loadGuestFavorites();
+    const guestNotes = loadGuestNotes();
+    const guestExists = guestFavorites.size > 0 || Object.keys(guestNotes).length > 0;
+    setGuestDataPresent(guestExists);
+    const optedOut = localStorage.getItem(SYNC_DISMISSED_KEY) === 'true';
+    if (!syncResolvedRef.current && !optedOut && guestExists) {
+      setPendingGuestData({ favorites: guestFavorites, notes: guestNotes });
+      setSyncPromptManual(false);
+      setSyncPromptOpen(true);
     }
+  };
+
+  // Manually open the sync prompt from the My Schedule button. Bypasses both the
+  // once-per-session guard and the "Don't ask again" opt-out.
+  const openSyncPrompt = () => {
+    const guestFavorites = loadGuestFavorites();
+    const guestNotes = loadGuestNotes();
+    if (guestFavorites.size === 0 && Object.keys(guestNotes).length === 0) return;
+    setPendingGuestData({ favorites: guestFavorites, notes: guestNotes });
+    setSyncPromptManual(true);
+    setSyncPromptOpen(true);
   };
 
   // Merge the pending device-local data into the logged-in account: favorites
@@ -189,6 +215,7 @@ export function AppProvider({ children }) {
         dancerNotes: mergedNotes,
       }, { merge: true });
       clearGuestData();
+      setGuestDataPresent(false);
     } catch {
       // Write failed — roll back state and keep guest data so it can be retried.
       setFavorites(prevFavorites);
@@ -197,11 +224,18 @@ export function AppProvider({ children }) {
   };
 
   // Decline the merge. Account data stays as-is; guest data is left in
-  // localStorage so it reappears when browsing logged out again.
-  const dismissSync = () => {
+  // localStorage so it reappears when browsing logged out again. When
+  // dontAskAgain is set, the automatic on-login prompt is suppressed for good
+  // (the manual My Schedule button still works).
+  const dismissSync = (dontAskAgain = false) => {
     syncResolvedRef.current = true;
     setSyncPromptOpen(false);
     setPendingGuestData(null);
+    if (dontAskAgain) {
+      try {
+        localStorage.setItem(SYNC_DISMISSED_KEY, 'true');
+      } catch { /* storage unavailable — non-fatal */ }
+    }
   };
 
   // --- Org ID Sync ---
@@ -284,6 +318,7 @@ export function AppProvider({ children }) {
         if (next.has(name)) next.delete(name);
         else next.add(name);
         saveGuestFavorites(next);
+        setGuestDataPresent(hasGuestData());
         return next;
       });
       return true;
@@ -322,6 +357,7 @@ export function AppProvider({ children }) {
         if (trimmed) next[key] = trimmed;
         else delete next[key];
         saveGuestNotes(next);
+        setGuestDataPresent(hasGuestData());
         return next;
       });
       return true;
@@ -390,7 +426,8 @@ export function AppProvider({ children }) {
     dancerNotes, setDancerNote,
     orgId, setOrgId, orgName, setOrgName, orgResolveAttempted,
     loginPromptOpen, setLoginPromptOpen,
-    syncPromptOpen, confirmSync, dismissSync,
+    syncPromptOpen, syncPromptManual, confirmSync, dismissSync,
+    openSyncPrompt, guestDataPresent,
     syncPromptCounts: {
       favorites: pendingGuestData ? pendingGuestData.favorites.size : 0,
       notes: pendingGuestData ? Object.keys(pendingGuestData.notes).length : 0,

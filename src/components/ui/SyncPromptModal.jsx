@@ -1,10 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CloudUpload, X, Check } from 'lucide-react';
 
 // Shown on login when the device has favorites/notes saved while logged out.
 // Lets the user merge that local data into their account, or keep it on the
 // device only (e.g. on a shared/family device).
-export default function SyncPromptModal({ isOpen, counts, onSync, onKeepSeparate }) {
+//
+// `manual` distinguishes the on-demand open (My Schedule "Sync" button) from the
+// automatic on-login prompt — the "Don't ask again" opt-out only applies to the
+// latter. onKeepSeparate receives the "don't ask again" choice as its argument.
+export default function SyncPromptModal({ isOpen, counts, manual = false, onSync, onKeepSeparate }) {
+  const [dontAskAgain, setDontAskAgain] = useState(false);
+
   if (!isOpen) return null;
 
   const fav = counts?.favorites || 0;
@@ -22,7 +28,7 @@ export default function SyncPromptModal({ isOpen, counts, onSync, onKeepSeparate
       {/* Panel */}
       <div className="relative w-full max-w-sm bg-white dark:bg-ink-800 rounded-card shadow-2xl p-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
         <button
-          onClick={onKeepSeparate}
+          onClick={() => onKeepSeparate(!manual && dontAskAgain)}
           className="absolute top-4 right-4 p-2 text-ink-400 hover:text-ink-600 dark:hover:text-ink-200 transition-colors rounded-card"
           aria-label="Keep on this device only"
         >
@@ -50,12 +56,24 @@ export default function SyncPromptModal({ isOpen, counts, onSync, onKeepSeparate
               <Check size={16} /> Sync to my account
             </button>
             <button
-              onClick={onKeepSeparate}
+              onClick={() => onKeepSeparate(!manual && dontAskAgain)}
               className="w-full px-5 py-3 text-ink-500 dark:text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 font-bold text-sm transition-colors"
             >
               Keep on this device only
             </button>
           </div>
+
+          {!manual && (
+            <label className="flex items-center justify-center gap-2 text-xs text-ink-400 dark:text-ink-500 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={dontAskAgain}
+                onChange={(e) => setDontAskAgain(e.target.checked)}
+                className="rounded border-ink-300 dark:border-ink-600 text-brand-600 focus:ring-brand-500"
+              />
+              Don't ask again on login
+            </label>
+          )}
         </div>
       </div>
     </div>

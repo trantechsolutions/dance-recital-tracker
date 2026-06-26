@@ -50,7 +50,7 @@ export default function App() {
     favorites, toggleFavorite,
     orgId, setOrgId, orgName, orgResolveAttempted,
     loginPromptOpen, setLoginPromptOpen,
-    syncPromptOpen, confirmSync, dismissSync, syncPromptCounts,
+    syncPromptOpen, syncPromptManual, confirmSync, dismissSync, syncPromptCounts,
   } = useApp();
 
   // 2. Initialize show locally from URL (for deep links)
@@ -344,6 +344,7 @@ export default function App() {
       <SyncPromptModal
         isOpen={syncPromptOpen}
         counts={syncPromptCounts}
+        manual={syncPromptManual}
         onSync={confirmSync}
         onKeepSeparate={dismissSync}
       />

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Heart, Star, Music, ArrowRight, Clock, Pencil, Check } from 'lucide-react';
+import { Heart, Star, Music, ArrowRight, Clock, Pencil, Check, CloudUpload } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Link } from 'react-router-dom';
 
@@ -116,6 +116,26 @@ function DancerNote({ dancer, note, isCurrent, onSave }) {
   );
 }
 
+// Offer to sync device-local favorites/notes into the account. Shown only when
+// logged in with un-synced guest data; opens the same modal as the login prompt.
+function SyncBanner() {
+  const { user, guestDataPresent, openSyncPrompt } = useApp();
+  if (!user || !guestDataPresent) return null;
+
+  return (
+    <button
+      onClick={openSyncPrompt}
+      className="w-full flex items-center gap-3 px-4 py-3 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800 rounded-card text-left hover:bg-brand-100 dark:hover:bg-brand-900/30 transition-colors"
+    >
+      <CloudUpload size={20} className="text-brand-600 shrink-0" />
+      <span className="flex-1 text-sm font-semibold text-brand-700 dark:text-brand-300">
+        Saved items on this device aren't in your account yet
+      </span>
+      <span className="text-xs font-bold text-brand-600 uppercase tracking-wide shrink-0">Sync</span>
+    </button>
+  );
+}
+
 export default function MyScheduleView({ showData, currentAct, showId }) {
   const { favorites, toggleFavorite, dancerNotes, setDancerNote } = useApp();
 
@@ -162,6 +182,8 @@ export default function MyScheduleView({ showData, currentAct, showId }) {
 
   if (schedule.length === 0) {
     return (
+      <div className="space-y-4 animate-in fade-in">
+      <SyncBanner />
       <div className="text-center py-16 bg-white dark:bg-ink-800 rounded-[2.5rem] border border-ink-100 dark:border-ink-700 shadow-sm space-y-4">
         <div className="w-20 h-20 bg-brand-50 dark:bg-brand-900/20 rounded-full flex items-center justify-center mx-auto">
           <Heart size={36} className="text-brand-300 dark:text-brand-700" />
@@ -187,11 +209,13 @@ export default function MyScheduleView({ showData, currentAct, showId }) {
           </Link>
         </div>
       </div>
+      </div>
     );
   }
 
   return (
     <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+      <SyncBanner />
       {/* Header */}
       <div className="px-0.5">
         <h2 className="text-xl sm:text-3xl font-semibold dark:text-white leading-tight">My Schedule</h2>

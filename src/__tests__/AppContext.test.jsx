@@ -375,6 +375,57 @@ describe('AppContext.toggleFavorite', () => {
     expect(JSON.parse(localStorage.getItem('guestFavorites'))).toEqual(['Bob']);
   });
 
+  it('dismissSync(true) suppresses the prompt on the next login', async () => {
+    localStorage.setItem('guestFavorites', JSON.stringify(['Bob']));
+    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ favorites: ['Alice'] }) });
+
+    const mockUser = { uid: 'u14', email: 'fan@example.com' };
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => { authCallback(mockUser); });
+    await act(async () => { captured.dismissSync(true); });
+    expect(localStorage.getItem('syncPromptDismissed')).toBe('true');
+
+    // Simulate logout then a fresh login — the prompt must not reopen.
+    await act(async () => { authCallback(null); });
+    await act(async () => { authCallback(mockUser); });
+
+    expect(captured.syncPromptOpen).toBe(false);
+    // ...but the data is still flagged as present for the manual Sync button.
+    expect(captured.guestDataPresent).toBe(true);
+  });
+
+  it('openSyncPrompt re-opens the prompt manually even after opting out', async () => {
+    localStorage.setItem('guestFavorites', JSON.stringify(['Bob']));
+    localStorage.setItem('syncPromptDismissed', 'true');
+    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ favorites: ['Alice'] }) });
+
+    const mockUser = { uid: 'u15', email: 'fan@example.com' };
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => { authCallback(mockUser); });
+    // Auto-prompt suppressed by the opt-out flag.
+    expect(captured.syncPromptOpen).toBe(false);
+
+    await act(async () => { captured.openSyncPrompt(); });
+    expect(captured.syncPromptOpen).toBe(true);
+    expect(captured.syncPromptManual).toBe(true);
+    expect(captured.syncPromptCounts).toEqual({ favorites: 1, notes: 0 });
+  });
+
+  it('tracks guestDataPresent as a logged-out user adds favorites', async () => {
+    let captured;
+    renderWithProvider(ctx => { captured = ctx; });
+
+    await act(async () => { authCallback(null); });
+    expect(captured.guestDataPresent).toBe(false);
+
+    await act(async () => { await captured.toggleFavorite('Alice'); });
+    expect(captured.guestDataPresent).toBe(true);
+  });
+
   it('adds a dancer to favorites when not already present', async () => {
     const mockUser = { uid: 'u7', email: 'fan@example.com' };
     getDoc.mockResolvedValue({ exists: () => false });

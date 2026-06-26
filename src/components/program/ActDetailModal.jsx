@@ -39,12 +39,12 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
         <div className={clsx(
           "relative p-6 sm:p-8 pb-8 sm:pb-12 text-center overflow-hidden",
           isCurrent
-            ? "bg-gradient-to-br from-brand-600 to-brand-700 text-white"
+            ? "bg-brand-100 dark:bg-brand-900/30 text-brand-900 dark:text-brand-100"
             : "bg-gradient-to-br from-brand-50 to-brand-50 dark:from-brand-900/30 dark:to-brand-900/20"
         )}>
           <Music size={80} className={clsx(
             "absolute -right-3 -bottom-3 rotate-12",
-            isCurrent ? "text-white/10" : "text-brand-200/50 dark:text-brand-800/20"
+            isCurrent ? "text-brand-300/40 dark:text-brand-700/30" : "text-brand-200/50 dark:text-brand-800/20"
           )} />
 
           <button
@@ -53,23 +53,23 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
             aria-label="Close"
             className={clsx(
               "absolute top-3 right-3 p-2 rounded-card transition-colors",
-              isCurrent ? "text-white/70 hover:text-white hover:bg-white/10" : "text-ink-400 hover:text-ink-600 hover:bg-ink-100 dark:hover:bg-ink-700"
+              isCurrent ? "text-brand-500 dark:text-brand-300 hover:text-brand-700 hover:bg-brand-200/50 dark:hover:bg-brand-800/40" : "text-ink-400 hover:text-ink-600 hover:bg-ink-100 dark:hover:bg-ink-700"
             )}
           >
             <X size={20} />
           </button>
 
           {isCurrent && (
-            <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm px-3 py-1 rounded-full mb-2">
-              <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse" />
+            <div className="inline-flex items-center gap-2 bg-brand-600 text-white px-3 py-1 rounded-full mb-2">
+              <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
               <span className="text-[9px] uppercase tracking-[0.15em] font-semibold">Now Performing</span>
             </div>
           )}
 
-          <div className={clsx("text-5xl font-semibold mb-1 tracking-tighter", isCurrent ? "text-white" : "text-brand-600")}>
+          <div className={clsx("text-5xl font-semibold mb-1 tracking-tighter", isCurrent ? "text-brand-900 dark:text-brand-100" : "text-brand-600")}>
             #{act.number}
           </div>
-          <h2 className={clsx("text-xl font-semibold leading-tight", isCurrent ? "text-white" : "text-ink-900 dark:text-white")}>
+          <h2 className={clsx("text-xl font-semibold leading-tight", isCurrent ? "text-brand-900 dark:text-brand-100" : "text-ink-900 dark:text-white")}>
             {act.title}
           </h2>
         </div>

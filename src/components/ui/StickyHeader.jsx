@@ -9,14 +9,14 @@ export default function StickyHeader({ currentAct, isAuthorized, onUpdate }) {
       <div
         role="status"
         aria-live="polite"
-        className="pointer-events-auto flex items-center gap-3 bg-ink-900 text-white px-4 py-2.5 rounded-card shadow-stage border border-stage-500/40 max-w-lg w-full"
+        className="pointer-events-auto flex items-center gap-3 bg-ink-900 text-white px-4 py-2.5 rounded-card shadow-lg shadow-brand-500/30 border border-brand-500/40 max-w-lg w-full"
       >
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
-          <span className="inline-flex items-center gap-1.5 bg-stage-500 text-ink-900 px-2 py-0.5 rounded-pill text-[10px] font-bold uppercase tracking-marquee shrink-0">
+          <span className="inline-flex items-center gap-1.5 bg-brand-600 text-white px-2 py-0.5 rounded-pill text-[10px] font-bold uppercase tracking-marquee shrink-0">
             <Radio size={10} className="animate-pulse" />
             Live
           </span>
-          <span className="text-stage-300 font-display text-lg leading-none shrink-0">
+          <span className="text-brand-300 font-display text-lg leading-none shrink-0">
             {currentAct.number}
           </span>
           <span className="truncate text-sm font-display italic text-white/90">{currentAct.title}</span>
@@ -35,7 +35,7 @@ export default function StickyHeader({ currentAct, isAuthorized, onUpdate }) {
             <button
               onClick={() => onUpdate(currentAct.number + 1)}
               aria-label="Next act"
-              className="w-11 h-11 bg-stage-500 text-ink-900 rounded-card hover:bg-stage-400 active:scale-90 transition-all flex items-center justify-center"
+              className="w-11 h-11 bg-brand-600 text-white rounded-card hover:bg-brand-700 active:scale-90 transition-all flex items-center justify-center"
             >
               <Plus size={16} />
             </button>
