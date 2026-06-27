@@ -1,13 +1,16 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useApp } from '../../../context/AppContext';
-import { RefreshCw, Eye, EyeOff, X, Plus, ShieldCheck } from 'lucide-react';
+import { RefreshCw, Eye, EyeOff, X, Plus, ShieldCheck, Unlock, Lock } from 'lucide-react';
 import { db, coll } from '../../../firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { addNameAccessEmail, removeNameAccessEmail } from '../../../services/nameAccessService';
+import { setUserStudioAccess } from '../../../services/showService';
 
 export default function UsersTab({ showToast }) {
   // nameAccessEmails comes from the live allowlist subscription in AppContext.
-  const { isSuperAdmin, nameAccessEmails } = useApp();
+  const { isSuperAdmin, nameAccessEmails, orgId, studioCode } = useApp();
+  // The studio-access column is only meaningful when a code gates the studio.
+  const showStudioCol = !!orgId && !!studioCode;
   const [appUsers, setAppUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [newEmail, setNewEmail] = useState('');
@@ -34,6 +37,24 @@ export default function UsersTab({ showToast }) {
   const revoke = async (email) => {
     try { await removeNameAccessEmail(email); showToast(`Removed full-name access for ${email}`, 'success'); }
     catch (e) { showToast(e.message, 'error'); }
+  };
+
+  // Studio access (per-account unlock of the current studio's code gate).
+  const hasStudioAccess = (u) => !!orgId && (u.studioAccess || []).includes(orgId);
+
+  const toggleStudioAccess = async (u) => {
+    const next = !hasStudioAccess(u);
+    try {
+      await setUserStudioAccess(u.id, orgId, next);
+      // Optimistically reflect the change without a full refetch.
+      setAppUsers(prev => prev.map(x => {
+        if (x.id !== u.id) return x;
+        const list = new Set(x.studioAccess || []);
+        if (next) list.add(orgId); else list.delete(orgId);
+        return { ...x, studioAccess: [...list] };
+      }));
+      showToast(next ? `Granted studio access to ${u.email}` : `Revoked studio access for ${u.email}`, 'success');
+    } catch (e) { showToast(e.message, 'error'); }
   };
 
   const handleAdd = async (e) => {
@@ -118,12 +139,14 @@ export default function UsersTab({ showToast }) {
                   <th className="px-6 py-3">User</th>
                   <th className="px-6 py-3">Favorites</th>
                   <th className="px-6 py-3">Last Login</th>
+                  {showStudioCol && <th className="px-6 py-3 text-right">Studio Access</th>}
                   <th className="px-6 py-3 text-right">Full Names</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-100 dark:divide-ink-700/50">
                 {appUsers.map(u => {
                   const allowed = hasAccess(u.email);
+                  const studioOk = hasStudioAccess(u);
                   return (
                     <tr key={u.id} className="text-sm hover:bg-ink-50 dark:hover:bg-ink-900/30 transition-colors">
                       <td className="px-6 py-4 font-bold dark:text-white">{u.email || 'Anonymous'}</td>
@@ -135,6 +158,25 @@ export default function UsersTab({ showToast }) {
                       <td className="px-6 py-4 text-ink-400 text-xs">
                         {u.last_login ? new Date(u.last_login).toLocaleDateString() : 'N/A'}
                       </td>
+                      {showStudioCol && (
+                        <td className="px-6 py-4 text-right">
+                          {u.email ? (
+                            <button
+                              onClick={() => toggleStudioAccess(u)}
+                              title={studioOk ? 'Revoke studio access' : 'Grant studio access'}
+                              className={
+                                studioOk
+                                  ? "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-card text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                                  : "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-card text-xs font-bold bg-ink-100 dark:bg-ink-700 text-ink-500 dark:text-ink-300 hover:text-red-500 transition-colors"
+                              }
+                            >
+                              {studioOk ? <><Unlock size={14} /> Granted</> : <><Lock size={14} /> No access</>}
+                            </button>
+                          ) : (
+                            <span className="text-ink-300 text-xs">—</span>
+                          )}
+                        </td>
+                      )}
                       <td className="px-6 py-4 text-right">
                         {u.email ? (
                           <button

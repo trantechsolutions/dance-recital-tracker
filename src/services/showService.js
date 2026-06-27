@@ -2,7 +2,7 @@ import { db, coll } from '../firebase';
 import { newActId } from '../utils/ids';
 import {
   collection, doc, getDocs, setDoc, deleteDoc, query,
-  where, writeBatch
+  where, writeBatch, arrayUnion, arrayRemove
 } from 'firebase/firestore';
 
 // Normalize an act title for matching across a CSV re-upload (case- and
@@ -271,6 +271,61 @@ export async function updateOrgAdmins(orgId, newAdmins) {
  */
 export async function updateOrgName(orgId, name) {
   await setDoc(doc(db, coll('organizations'), orgId), { name, slug: orgId }, { merge: true });
+}
+
+/**
+ * Generate a random studio code in `xxxx-xxxx` form (two groups of four), using
+ * an unambiguous lowercase alphanumeric alphabet (no 0/o/1/l/i). Matches the
+ * 8-box segmented entry on the studio-code screen.
+ */
+export function generateStudioCode() {
+  const charset = '23456789abcdefghjkmnpqrstuvwxyz';
+  const bytes = new Uint8Array(8);
+  (globalThis.crypto || crypto).getRandomValues(bytes);
+  let out = '';
+  for (let i = 0; i < 8; i++) out += charset[bytes[i] % charset.length];
+  return `${out.slice(0, 4)}-${out.slice(4, 8)}`;
+}
+
+/**
+ * Set (or clear, with an empty string) the studio access code — a shareable
+ * passcode visitors must enter after login. Stored normalized (trimmed +
+ * lowercased) so entry matching is case-insensitive.
+ */
+export async function updateOrgStudioCode(orgId, code) {
+  const studioCode = (code || '').trim().toLowerCase();
+  await setDoc(doc(db, coll('organizations'), orgId), { studioCode }, { merge: true });
+}
+
+/**
+ * Grant or revoke one account's access to a studio. Access is tracked on the
+ * user's profile as `studioAccess: [orgId,...]`. Super-admin only (Firestore
+ * rules let a super admin write any profile); the account re-evaluates the gate
+ * on its next load.
+ */
+export async function setUserStudioAccess(uid, orgId, hasAccess) {
+  await setDoc(
+    doc(db, coll('user_profiles'), uid),
+    { studioAccess: hasAccess ? arrayUnion(orgId) : arrayRemove(orgId) },
+    { merge: true }
+  );
+}
+
+/**
+ * Revoke EVERY account's access to a studio at once, forcing all non-admins to
+ * re-enter the studio code on their next load. Returns the number of profiles
+ * updated.
+ */
+export async function revokeAllStudioAccess(orgId) {
+  const snap = await getDocs(query(
+    collection(db, coll('user_profiles')),
+    where('studioAccess', 'array-contains', orgId)
+  ));
+  if (snap.empty) return 0;
+  const batch = writeBatch(db);
+  snap.docs.forEach(d => batch.update(d.ref, { studioAccess: arrayRemove(orgId) }));
+  await batch.commit();
+  return snap.size;
 }
 
 /**

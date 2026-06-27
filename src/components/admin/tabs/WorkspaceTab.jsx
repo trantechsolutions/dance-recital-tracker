@@ -4,14 +4,14 @@ import {
   Save, Calendar, Plus, Upload, X, Check,
   Database, Hash, Users, Pencil, Radio, SkipForward, SkipBack,
   Square, Play, Tv2, Download, Building2, Shield, RefreshCw,
-  Trash2, ChevronDown, ChevronRight, Settings
+  Trash2, ChevronDown, ChevronRight, Settings, KeyRound
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import Papa from 'papaparse';
 import PerformerEditor from '../PerformerEditor';
 import {
   saveShow, createShow, uploadActsForShow, bulkImportShows,
-  createOrg, updateOrgAdmins, updateOrgName, deleteStudio, deleteShow,
+  createOrg, updateOrgAdmins, updateOrgName, updateOrgStudioCode, generateStudioCode, revokeAllStudioAccess, deleteStudio, deleteShow,
 } from '../../../services/showService';
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor,
@@ -218,14 +218,61 @@ function ManageStudioAccordion({ orgData, setOrgData, showToast, setPromptModal,
   const { orgId, setOrgId, setOrgName } = useApp();
   const [expanded, setExpanded] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
+  const [codeDraft, setCodeDraft] = useState('');
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteLog, setDeleteLog] = useState([]);
 
-  // Keep the rename draft in sync when the org doc (re)loads
+  // Keep the drafts in sync when the org doc (re)loads
   useEffect(() => { setNameDraft(orgData.name || ''); }, [orgData.name]);
+  useEffect(() => { setCodeDraft(orgData.studioCode || ''); }, [orgData.studioCode]);
 
   if (!orgId) return null;
+
+  const normalizedCode = (orgData.studioCode || '').trim().toLowerCase();
+
+  const handleSaveStudioCode = async () => {
+    const next = codeDraft.trim().toLowerCase();
+    if (next === normalizedCode) return;
+    try {
+      await updateOrgStudioCode(orgId, next);
+      setOrgData({ ...orgData, studioCode: next });
+      showToast(next ? 'Studio code saved' : 'Studio code removed', 'success');
+    } catch (e) { showToast(e.message, 'error'); }
+  };
+
+  const handleGenerateCode = async () => {
+    const code = generateStudioCode();
+    try {
+      await updateOrgStudioCode(orgId, code);
+      setOrgData({ ...orgData, studioCode: code });
+      setCodeDraft(code);
+      showToast(`New studio code: ${code.toUpperCase()}`, 'success');
+    } catch (e) { showToast(e.message, 'error'); }
+  };
+
+  // Revoke is a full reset: clear every account's access AND issue a fresh code,
+  // so the old (now widely-shared) code stops working.
+  const handleResetAccess = () => {
+    const name = orgData.name || orgId;
+    setPromptModal({
+      title: 'Revoke all studio access',
+      message: `This clears every family's access and issues a NEW code — everyone must re-enter the new code. Type "${name}" to confirm.`,
+      placeholder: name,
+      onConfirm: async (input) => {
+        setPromptModal(null);
+        if (input !== name) return showToast("Name didn't match. Cancelled.", 'error');
+        try {
+          const count = await revokeAllStudioAccess(orgId);
+          const code = generateStudioCode();
+          await updateOrgStudioCode(orgId, code);
+          setOrgData({ ...orgData, studioCode: code });
+          setCodeDraft(code);
+          showToast(`Revoked ${count} account${count !== 1 ? 's' : ''}. New code: ${code.toUpperCase()}`, 'success');
+        } catch (e) { showToast(e.message, 'error'); }
+      },
+    });
+  };
 
   const handleRenameStudio = async () => {
     const name = nameDraft.trim();
@@ -315,6 +362,55 @@ function ManageStudioAccordion({ orgData, setOrgData, showToast, setPromptModal,
             <p className="text-[10px] text-ink-400 mt-1.5">
               Display name only — the studio id <span className="font-mono">{orgId}</span> stays unchanged.
             </p>
+          </div>
+
+          {/* Studio Code Section */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <KeyRound size={13} className="text-ink-400" />
+              <label className="text-[10px] font-semibold uppercase text-ink-400 tracking-widest">
+                Studio Code
+              </label>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="XXXX-XXXX (or click Generate)"
+                autoCapitalize="none"
+                spellCheck={false}
+                className="flex-1 min-w-0 bg-ink-50 dark:bg-ink-900 p-3 rounded-card dark:text-white border border-ink-200 dark:border-ink-700 outline-none focus:border-brand-500 text-sm font-bold font-mono tracking-wider uppercase placeholder:normal-case"
+                value={codeDraft}
+                onChange={e => setCodeDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleSaveStudioCode(); }}
+              />
+              <button
+                onClick={handleGenerateCode}
+                title="Generate a new random code"
+                className="inline-flex items-center gap-1.5 bg-ink-100 dark:bg-ink-700 text-ink-700 dark:text-white px-4 rounded-card font-bold text-sm hover:bg-ink-200 dark:hover:bg-ink-600 transition-colors shrink-0"
+              >
+                <RefreshCw size={14} /> Generate
+              </button>
+              <button
+                onClick={handleSaveStudioCode}
+                disabled={codeDraft.trim().toLowerCase() === normalizedCode}
+                className="bg-brand-600 text-white px-5 rounded-card font-bold text-sm hover:bg-brand-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              >
+                Save
+              </button>
+            </div>
+            <p className="text-[10px] text-ink-400 mt-1.5">
+              {normalizedCode
+                ? <>Families enter this code once after signing in; access then sticks to their account. Case-insensitive.</>
+                : <>No code set — signed-in users go straight to the program. Add one to gate the share link.</>}
+            </p>
+            {normalizedCode && (
+              <button
+                onClick={handleResetAccess}
+                className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-card text-xs font-bold text-red-600 bg-red-50 dark:bg-red-900/15 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+              >
+                <Trash2 size={13} /> Revoke all access (re-prompt everyone)
+              </button>
+            )}
           </div>
 
           {/* Admins Section */}

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { auth, db, authorizedUsers, coll } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, arrayUnion } from 'firebase/firestore';
 import { MULTI_STUDIO_ENABLED, DEFAULT_ORG_ID } from '../config';
 import { subscribeNameAccess } from '../services/nameAccessService';
 
@@ -94,6 +94,22 @@ export function AppProvider({ children }) {
   // falls through to the first real org instead of re-pinning a bad config.
   const invalidDefaultOrg = useRef(false);
   const [orgName, setOrgName] = useState('');
+  // Studio access code (shareable passcode) gating the app AFTER login. The
+  // code gates a studio: once an account enters it correctly, the unlock is
+  // recorded on that user's profile (`studioAccess`: array of org ids), so it
+  // follows the account across devices and is never re-prompted. `studioCode` is
+  // the org's current code ('' = none). `codeLoadedFor` records which org's code
+  // has been fetched so the gate can wait on a spinner until it's known.
+  const [studioCode, setStudioCode] = useState('');
+  const [studioAccess, setStudioAccess] = useState([]);
+  const codeLoadedFor = useRef(null);
+
+  // A studio is unlocked when it has no code, the viewer is an admin (they
+  // manage it), or the account has previously cleared this org's code.
+  const studioUnlocked = useMemo(
+    () => !studioCode || isSuperAdmin || isStudioAdmin || studioAccess.includes(orgId),
+    [studioCode, isSuperAdmin, isStudioAdmin, studioAccess, orgId]
+  );
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
   // Login-time prompt offering to merge device-local (guest) favorites/notes
   // into the account. pendingGuestData holds the captured guest data; the ref
@@ -134,6 +150,7 @@ export function AppProvider({ children }) {
           setUser(null);
           setIsSuperAdmin(false);
           setIsStudioAdmin(false);
+          setStudioAccess([]);
           // Fall back to whatever was saved while browsing as a guest.
           setFavorites(loadGuestFavorites());
           setDancerNotes(loadGuestNotes());
@@ -184,6 +201,8 @@ export function AppProvider({ children }) {
     const data = profileSnap.exists() ? profileSnap.data() : {};
     setFavorites(new Set(data.favorites || []));
     setDancerNotes(data.dancerNotes || {});
+    // Studios this account has already unlocked with the studio code.
+    setStudioAccess(data.studioAccess || []);
 
     // Upsert user profile with login timestamp
     await setDoc(profileRef, {
@@ -327,6 +346,11 @@ export function AppProvider({ children }) {
         setOrgName(data.name || '');
         const studioAdmin = !!(user && data.admins?.includes(user.email));
         setIsStudioAdmin(studioAdmin);
+
+        // Resolve the studio code (whether this account has cleared it is
+        // derived from the profile's studioAccess list).
+        setStudioCode((data.studioCode || '').trim().toLowerCase());
+        codeLoadedFor.current = orgId;
       } catch (err) {
         console.error('[Org] Failed to fetch org:', err);
       }
@@ -413,6 +437,21 @@ export function AppProvider({ children }) {
     localStorage.setItem('hasSkippedLogin', 'true');
   };
 
+  // Validate a studio-code entry (the gate runs after login). On match, record
+  // the unlock on the account's profile so it persists across devices and is
+  // never re-prompted; local state updates optimistically. Comparison is
+  // normalized to match how the code is stored. Returns true on success.
+  const submitStudioCode = (input) => {
+    const entered = (input || '').trim().toLowerCase();
+    if (!studioCode || entered !== studioCode) return false;
+    setStudioAccess(prev => prev.includes(orgId) ? prev : [...prev, orgId]);
+    if (user) {
+      setDoc(doc(db, coll('user_profiles'), user.uid), { studioAccess: arrayUnion(orgId) }, { merge: true })
+        .catch(() => { /* non-fatal — local state already unlocked for this session */ });
+    }
+    return true;
+  };
+
   // --- Tutorial ---
   const TUTORIAL_SEEN_KEY = 'tutorialSeen_v1';
   // True the very first time a visitor reaches the app (no dismissal stored).
@@ -452,6 +491,8 @@ export function AppProvider({ children }) {
     favorites, toggleFavorite,
     dancerNotes, setDancerNote,
     orgId, setOrgId, orgName, setOrgName, orgResolveAttempted,
+    studioCode, studioUnlocked, submitStudioCode,
+    studioCodeReady: codeLoadedFor.current === orgId,
     loginPromptOpen, setLoginPromptOpen,
     syncPromptOpen, syncPromptManual, confirmSync, dismissSync,
     openSyncPrompt, guestDataPresent,
