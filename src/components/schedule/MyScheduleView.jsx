@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { Heart, Star, Music, ArrowRight, Clock, Pencil, Check, CloudUpload } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Link } from 'react-router-dom';
+import { displayName } from '../../utils/names';
 
 // Per-dancer-per-act note key. Keyed by the act's stable `id` so notes stay
 // attached to the dance across reorders/renumbering. Acts saved before stable
@@ -15,11 +16,13 @@ const dancerNoteKey = (showId, act, dancer) =>
 
 // A favorited dancer chip with an inline, editable private note.
 function DancerNote({ dancer, note, isCurrent, onSave }) {
+  const { canViewFullNames } = useApp();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note || '');
   const cancelling = useRef(false);
 
   const startEditing = () => { setDraft(note || ''); setEditing(true); };
+  const shownName = displayName(dancer, canViewFullNames);
 
   const commit = () => {
     if (cancelling.current) { cancelling.current = false; return; }
@@ -48,13 +51,13 @@ function DancerNote({ dancer, note, isCurrent, onSave }) {
           "text-xs font-bold",
           isCurrent ? "text-white" : "text-brand-600 dark:text-brand-400"
         )}>
-          {dancer}
+          {shownName}
         </span>
         {!editing && (
           <button
             type="button"
             onClick={startEditing}
-            aria-label={note ? `Edit note for ${dancer}` : `Add note for ${dancer}`}
+            aria-label={note ? `Edit note for ${shownName}` : `Add note for ${shownName}`}
             className={clsx(
               "ml-auto inline-flex items-center gap-1 text-[10px] font-semibold transition-colors",
               isCurrent

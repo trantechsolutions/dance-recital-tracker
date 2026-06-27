@@ -37,20 +37,24 @@ export default function LoginScreen({ onSkip }) {
             Welcome
           </h1>
           <p className="text-ink-500 dark:text-ink-400 text-base px-4 leading-relaxed">
-            Browse the full recital program — no account needed.
+            {onSkip
+              ? 'Browse the full recital program — no account needed.'
+              : 'Sign in to view the recital program.'}
           </p>
         </div>
 
         <div className="space-y-3">
-          {/* Primary CTA — Guest */}
-          <button
-            onClick={onSkip}
-            className="w-full py-4 bg-brand-600 text-white rounded-card font-semibold text-base hover:bg-brand-700 active:scale-[0.98] transition-all"
-          >
-            Browse Program
-          </button>
+          {/* Primary CTA — Guest (only when guest browsing is allowed) */}
+          {onSkip && (
+            <button
+              onClick={onSkip}
+              className="w-full py-4 bg-brand-600 text-white rounded-card font-semibold text-base hover:bg-brand-700 active:scale-[0.98] transition-all"
+            >
+              Browse Program
+            </button>
+          )}
 
-          {/* Google sign-in — secondary */}
+          {/* Google sign-in */}
           <button
             onClick={async () => {
               setAuthError('');

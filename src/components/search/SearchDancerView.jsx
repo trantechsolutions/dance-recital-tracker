@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
-import { Star, Search as SearchIcon, Cloud, Share2, Check, Heart, Hash } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { Star, Search as SearchIcon, Cloud, Share2, Check, Heart, Hash, Lock } from 'lucide-react';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { clsx } from 'clsx';
+import { displayName } from '../../utils/names';
 
 export default function SearchDancerView({ showData, selectedShow, favorites, toggleFavorite, user }) {
-  const { orgId } = useApp();
+  const { orgId, canViewFullNames } = useApp();
   const [searchParams] = useSearchParams();
   const [inputValue, setInputValue] = useState(() => searchParams.get('q') || '');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
@@ -76,6 +77,30 @@ export default function SearchDancerView({ showData, selectedShow, favorites, to
     );
   }
 
+  // Searching by dancer name requires an account — names are hidden from
+  // logged-out visitors to protect performers' privacy.
+  if (!user) {
+    return (
+      <div className="text-center py-12 sm:py-20 bg-white dark:bg-ink-800 rounded-card border border-ink-100 dark:border-ink-700 shadow-sm space-y-4 animate-in fade-in">
+        <div className="w-16 h-16 bg-brand-50 dark:bg-brand-900/20 rounded-full flex items-center justify-center mx-auto">
+          <Lock size={28} className="text-brand-400 dark:text-brand-600" />
+        </div>
+        <div>
+          <h3 className="text-base font-semibold dark:text-white mb-1">Sign in to search dancers</h3>
+          <p className="text-ink-400 text-sm max-w-sm mx-auto px-4">
+            Dancer names are hidden to protect performers' privacy. Sign in to search and favorite dancers.
+          </p>
+        </div>
+        <Link
+          to="/settings"
+          className="inline-flex items-center gap-2 px-5 py-3 bg-brand-600 text-white rounded-card font-bold text-sm shadow-lg shadow-brand-500/20 hover:bg-brand-700 transition-colors"
+        >
+          <Lock size={16} /> Sign In
+        </Link>
+      </div>
+    );
+  }
+
   const DancerCard = ({ res }) => {
     const isFav = favorites?.has(res.name);
     return (
@@ -95,7 +120,7 @@ export default function SearchDancerView({ showData, selectedShow, favorites, to
             </div>
             <div className="min-w-0">
               <div className={clsx("font-bold text-sm truncate", isFav ? "text-brand-600 dark:text-brand-400" : "dark:text-white")}>
-                {res.name}
+                {displayName(res.name, canViewFullNames)}
               </div>
               <div className="text-[10px] font-bold text-ink-400">{res.acts.length} act{res.acts.length !== 1 ? 's' : ''}</div>
             </div>

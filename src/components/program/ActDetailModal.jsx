@@ -1,8 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { X, Star, Heart, Share2, Music } from 'lucide-react';
+import { X, Star, Heart, Share2, Music, Lock } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { clsx } from 'clsx';
+import { useApp } from '../../context/AppContext';
+import { displayName } from '../../utils/names';
 
 export default function ActDetailModal({ act, isOpen, onClose, favorites, toggleFavorite, isCurrent, showId }) {
+  const { user, canViewFullNames } = useApp();
   const closeButtonRef = useRef(null);
 
   useEffect(() => {
@@ -19,7 +23,10 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
   const isActFav = favorites?.has(actKey);
 
   const handleShare = async () => {
-    const text = `Act #${act.number}: ${act.title}\nPerformers: ${act.performers?.join(', ') || 'N/A'}`;
+    const performerLine = user
+      ? (act.performers?.map((p) => displayName(p, canViewFullNames)).join(', ') || 'N/A')
+      : 'Sign in to view';
+    const text = `Act #${act.number}: ${act.title}\nPerformers: ${performerLine}`;
     if (navigator.share) {
       try { await navigator.share({ title: `Act #${act.number}`, text }); return; }
       catch { /* cancelled */ }
@@ -100,8 +107,23 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
           {act.performers?.length > 0 && (
             <div>
               <h3 className="text-[10px] font-semibold uppercase text-ink-400 tracking-widest mb-2 px-0.5">
-                Performers ({act.performers.length})
+                Performers{user ? ` (${act.performers.length})` : ''}
               </h3>
+              {!user ? (
+                <Link
+                  to="/settings"
+                  onClick={onClose}
+                  className="flex items-center gap-3 p-4 rounded-card bg-ink-50 dark:bg-ink-900 border border-dashed border-ink-200 dark:border-ink-700 hover:border-brand-300 dark:hover:border-brand-700 transition-colors group"
+                >
+                  <div className="w-9 h-9 rounded-full bg-ink-100 dark:bg-ink-800 text-ink-400 group-hover:text-brand-600 flex items-center justify-center shrink-0 transition-colors">
+                    <Lock size={16} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold dark:text-white">Sign in to view dancer names</p>
+                    <p className="text-xs text-ink-400 mt-0.5">Names are hidden to protect performers' privacy.</p>
+                  </div>
+                </Link>
+              ) : (
               <div className="space-y-1.5">
                 {act.performers.map((performer, i) => {
                   const isDancerFav = favorites?.has(performer);
@@ -128,7 +150,7 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
                           "font-bold text-sm",
                           isDancerFav ? "text-brand-600 dark:text-brand-400" : "dark:text-white"
                         )}>
-                          {performer}
+                          {displayName(performer, canViewFullNames)}
                         </span>
                       </div>
                       <button
@@ -144,6 +166,7 @@ export default function ActDetailModal({ act, isOpen, onClose, favorites, toggle
                   );
                 })}
               </div>
+              )}
             </div>
           )}
         </div>

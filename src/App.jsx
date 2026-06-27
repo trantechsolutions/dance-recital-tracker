@@ -2,7 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useApp } from './context/AppContext';
 import { useLiveTracker } from './hooks/useLiveTracker';
-import { MULTI_STUDIO_ENABLED } from './config';
+import { MULTI_STUDIO_ENABLED, LOGIN_REQUIRED } from './config';
+import { auth } from './firebase';
+import { signOut } from 'firebase/auth';
+import LoginScreen from './components/LoginScreen';
+import StudioCodeScreen from './components/StudioCodeScreen';
 
 // Icons
 import {
@@ -49,6 +53,7 @@ export default function App() {
     user, isAuthorized, isSuperAdmin, isAuthChecking,
     favorites, toggleFavorite,
     orgId, setOrgId, orgName, orgResolveAttempted,
+    studioCode, studioUnlocked, submitStudioCode, studioCodeReady,
     loginPromptOpen, setLoginPromptOpen,
     syncPromptOpen, syncPromptManual, confirmSync, dismissSync, syncPromptCounts,
   } = useApp();
@@ -123,9 +128,23 @@ export default function App() {
 
   if (isAuthChecking) return <LoadingScreen text="Loading" />;
 
-  // No login gate — the app opens straight into the program. Signing in is
-  // optional (favorites sync) and lives in Settings, reachable from the
-  // sign-in placeholders in the sidebar / mobile header.
+  // --- ACCESS GATES (login → studio code) ---
+  // Gated only when LOGIN_REQUIRED. You must sign in first (no guest access);
+  // then, if the studio set a code, your account must clear it once. Admins and
+  // accounts that already unlocked this studio (studioUnlocked) skip the code.
+  if (LOGIN_REQUIRED) {
+    // 1) Hard login gate — onSkip omitted hides the "Browse Program" button.
+    if (!user) return <LoginScreen />;
+
+    // Wait until we know whether this org requires a code (org doc fetched),
+    // so the code screen doesn't flash before the requirement resolves.
+    if (orgId && !studioCodeReady) return <LoadingScreen text="Loading" />;
+
+    // 2) Studio code: a shareable passcode that gates the studio's content.
+    if (studioCode && !studioUnlocked) {
+      return <StudioCodeScreen orgName={orgName} onSubmit={submitStudioCode} onSignOut={() => signOut(auth)} />;
+    }
+  }
 
   if (!orgId && !location.pathname.startsWith('/settings') && !(isSuperAdmin && location.pathname.startsWith('/admin'))) {
     // Single-studio mode: the org resolves automatically (ADR-002) — show a
