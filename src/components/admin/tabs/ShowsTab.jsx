@@ -531,20 +531,21 @@ function SortableActCard({ act, idx, updateAct, onRemove, onMoveUp, onMoveDown, 
   return (
     <div ref={setNodeRef} style={style}
       className="bg-white dark:bg-ink-800 p-5 rounded-card border border-ink-100 dark:border-ink-700 shadow-sm flex flex-col lg:flex-row gap-4 group relative">
-      <div className="absolute left-1 top-1/2 -translate-y-1/2 flex flex-col items-center">
-        <button onClick={onMoveUp} disabled={isFirst} title="Move act up"
-          className="p-1 text-ink-300 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent">
+      {/* Reorder controls — move up / drag / move down */}
+      <div className="flex lg:flex-col items-center justify-center gap-1.5 shrink-0">
+        <button onClick={onMoveUp} disabled={isFirst} title="Move act up" aria-label="Move act up"
+          className="p-2 rounded-lg bg-ink-100 dark:bg-ink-700 text-ink-600 dark:text-ink-200 hover:bg-brand-500 hover:text-white active:scale-90 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-ink-100 dark:disabled:hover:bg-ink-700 disabled:hover:text-ink-600">
           <ChevronUp size={18} />
         </button>
-        <div {...attributes} {...listeners} title="Drag to reorder" className="p-1 text-ink-300 cursor-grab hover:text-brand-500 transition-colors">
+        <div {...attributes} {...listeners} title="Drag to reorder" className="hidden lg:block p-1 text-ink-300 cursor-grab hover:text-brand-500 transition-colors">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>
         </div>
-        <button onClick={onMoveDown} disabled={isLast} title="Move act down"
-          className="p-1 text-ink-300 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent">
+        <button onClick={onMoveDown} disabled={isLast} title="Move act down" aria-label="Move act down"
+          className="p-2 rounded-lg bg-ink-100 dark:bg-ink-700 text-ink-600 dark:text-ink-200 hover:bg-brand-500 hover:text-white active:scale-90 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-ink-100 dark:disabled:hover:bg-ink-700 disabled:hover:text-ink-600">
           <ChevronDown size={18} />
         </button>
       </div>
-      <div className="lg:w-1/3 pl-9 flex items-start gap-3">
+      <div className="lg:w-1/3 flex items-start gap-3">
         <div className="w-10 h-10 flex items-center justify-center font-semibold text-brand-600 bg-ink-50 dark:bg-ink-900 rounded-card shrink-0 text-sm">{act.number}</div>
         <div className="flex-1">
           <label className="text-[8px] font-semibold text-ink-300 uppercase block mb-1">Title</label>
