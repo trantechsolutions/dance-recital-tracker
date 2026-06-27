@@ -61,11 +61,14 @@ export default function App() {
   // 2. Initialize show locally from URL (for deep links)
   const [selectedShow, setSelectedShow] = useState(() => searchParams.get('show') || '');
 
-  // 3. Track Live Data
+  // 3. Track Live Data — hold the Firestore subscription until auth is ready.
+  // When LOGIN_REQUIRED, shows/acts reads need an authenticated token; firing
+  // the listener before sign-in gets a permission-denied it never recovers from.
+  const dataAccessReady = !LOGIN_REQUIRED || !!user;
   const {
     recitalData, currentAct, loading, liveShowId,
     setRecitalData, invalidateActsCache, updateActNumber, toggleTracking
-  } = useLiveTracker(orgId, selectedShow);
+  } = useLiveTracker(orgId, selectedShow, dataAccessReady);
 
   // 4. Handle deep-linked Organization (only on initial load).
   // Single-studio mode ignores ?org= — the tenant is resolved by AppContext.

@@ -319,4 +319,21 @@ describe('useLiveTracker', () => {
     unmount();
     expect(unsubMock).toHaveBeenCalledTimes(1);
   });
+
+  it('does not subscribe while disabled (auth not ready), then subscribes once enabled', () => {
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useLiveTracker('org1', null, enabled),
+      { initialProps: { enabled: false } }
+    );
+
+    // Gated off: no listener, but loading stays true so the UI doesn't flash
+    // empty content before the real subscription resolves.
+    expect(onSnapshot).not.toHaveBeenCalled();
+    expect(result.current.loading).toBe(true);
+    expect(result.current.recitalData).toBeNull();
+
+    // Auth becomes ready → the listener subscribes.
+    rerender({ enabled: true });
+    expect(onSnapshot).toHaveBeenCalledTimes(1);
+  });
 });

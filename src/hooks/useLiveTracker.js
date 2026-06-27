@@ -4,7 +4,7 @@ import {
   collection, query, where, getDocs, doc, setDoc, onSnapshot
 } from 'firebase/firestore';
 
-export function useLiveTracker(orgId, selectedShowId) {
+export function useLiveTracker(orgId, selectedShowId, enabled = true) {
   const [recitalData, setRecitalData] = useState(null);
   const [currentAct, setCurrentAct] = useState({ number: null, title: '', isTracking: false });
   const [loading, setLoading] = useState(true);
@@ -20,6 +20,19 @@ export function useLiveTracker(orgId, selectedShowId) {
       setRecitalData(null);
       setLoading(false);
       actsCache.current = {};
+      return;
+    }
+
+    // Firestore rules now gate shows/acts reads behind `request.auth != null`.
+    // Subscribing before sign-in completes gets a permission-denied that
+    // onSnapshot never recovers from (the [orgId] dep doesn't re-run on login),
+    // stranding the UI on an infinite spinner. `enabled` (auth-ready) holds the
+    // subscription until the user is authenticated; clearing it on logout drops
+    // the previous studio's data so it can't leak into a re-login.
+    if (!enabled) {
+      setRecitalData(null);
+      actsCache.current = {};
+      setLoading(true);
       return;
     }
 
@@ -109,10 +122,16 @@ export function useLiveTracker(orgId, selectedShowId) {
       } finally {
         setLoading(false);
       }
+    }, (err) => {
+      // Listener rejected (e.g. permission-denied before any snapshot). Without
+      // this handler the success callback never fires and `loading` stays true
+      // forever — the infinite-spinner bug. Resolve loading so the UI can render.
+      console.error("Firestore Program subscription error:", err);
+      setLoading(false);
     });
 
     return () => unsubShows();
-  }, [orgId]);
+  }, [orgId, enabled]);
 
   // 2. Listen for "Now Performing" status for the specific show
   useEffect(() => {
@@ -138,6 +157,9 @@ export function useLiveTracker(orgId, selectedShowId) {
         title: act ? act.title : 'Act not found',
         isTracking: statusData.is_tracking || false
       });
+    }, (err) => {
+      // Non-critical: a rejected status listener just leaves currentAct stale.
+      console.warn("Firestore Status subscription error:", err?.message || err);
     });
 
     return () => unsubStatus();

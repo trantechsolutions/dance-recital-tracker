@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Music, ChevronDown, AlertCircle } from 'lucide-react';
+import { ChevronDown, AlertCircle } from 'lucide-react';
+import BrandMark from './BrandMark';
 import { auth, googleProvider } from '../firebase';
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getAuthErrorMessage } from '../utils/authErrors';
@@ -30,9 +31,7 @@ export default function LoginScreen({ onSkip }) {
       <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-700">
 
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Music size={36} />
-          </div>
+          <BrandMark className="w-20 h-20 mx-auto mb-6 shadow-lg shadow-brand-500/20" />
           <h1 className="font-display text-5xl font-medium italic text-ink-900 dark:text-white tracking-tight mb-3 leading-none">
             Welcome
           </h1>
