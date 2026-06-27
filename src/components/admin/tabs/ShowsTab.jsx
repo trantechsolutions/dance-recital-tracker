@@ -3,7 +3,7 @@ import { useApp } from '../../../context/AppContext';
 import {
   Save, Calendar, Plus, Upload, X, Check,
   Database, Hash, Users, Pencil, Radio, SkipForward, SkipBack,
-  Square, Play, Tv2, Download
+  Square, Play, Tv2, Download, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import Papa from 'papaparse';
@@ -124,6 +124,13 @@ export default function ShowsTab({
       const reordered = arrayMove(editData.acts, oldIndex, newIndex).map((a, i) => ({ ...a, number: i + 1 }));
       setEditData({ ...editData, acts: reordered });
     }
+  };
+
+  const moveAct = (index, direction) => {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= editData.acts.length) return;
+    const reordered = arrayMove(editData.acts, index, newIndex).map((a, i) => ({ ...a, number: i + 1 }));
+    setEditData({ ...editData, acts: reordered });
   };
 
   const handleFileUpload = (e) => {
@@ -493,6 +500,8 @@ export default function ShowsTab({
               <div className="space-y-3">
                 {editData.acts.map((act, idx) => (
                   <SortableActCard key={act.number} act={act} idx={idx} updateAct={updateAct}
+                    isFirst={idx === 0} isLast={idx === editData.acts.length - 1}
+                    onMoveUp={() => moveAct(idx, -1)} onMoveDown={() => moveAct(idx, 1)}
                     onRemove={() => {
                       const filtered = editData.acts.filter((_, i) => i !== idx).map((a, i) => ({ ...a, number: i + 1 }));
                       setEditData({ ...editData, acts: filtered });
@@ -516,16 +525,26 @@ export default function ShowsTab({
   );
 }
 
-function SortableActCard({ act, idx, updateAct, onRemove }) {
+function SortableActCard({ act, idx, updateAct, onRemove, onMoveUp, onMoveDown, isFirst, isLast }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: act.number });
   const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : 1, opacity: isDragging ? 0.6 : 1 };
   return (
     <div ref={setNodeRef} style={style}
       className="bg-white dark:bg-ink-800 p-5 rounded-card border border-ink-100 dark:border-ink-700 shadow-sm flex flex-col lg:flex-row gap-4 group relative">
-      <div {...attributes} {...listeners} className="absolute left-2 top-1/2 -translate-y-1/2 p-2 text-ink-300 cursor-grab hover:text-brand-500 transition-colors">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>
+      <div className="absolute left-1 top-1/2 -translate-y-1/2 flex flex-col items-center">
+        <button onClick={onMoveUp} disabled={isFirst} title="Move act up"
+          className="p-1 text-ink-300 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent">
+          <ChevronUp size={18} />
+        </button>
+        <div {...attributes} {...listeners} title="Drag to reorder" className="p-1 text-ink-300 cursor-grab hover:text-brand-500 transition-colors">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>
+        </div>
+        <button onClick={onMoveDown} disabled={isLast} title="Move act down"
+          className="p-1 text-ink-300 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded-lg transition-colors disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent">
+          <ChevronDown size={18} />
+        </button>
       </div>
-      <div className="lg:w-1/3 pl-8 flex items-start gap-3">
+      <div className="lg:w-1/3 pl-9 flex items-start gap-3">
         <div className="w-10 h-10 flex items-center justify-center font-semibold text-brand-600 bg-ink-50 dark:bg-ink-900 rounded-card shrink-0 text-sm">{act.number}</div>
         <div className="flex-1">
           <label className="text-[8px] font-semibold text-ink-300 uppercase block mb-1">Title</label>
