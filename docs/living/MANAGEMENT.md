@@ -2,6 +2,22 @@
 
 Scope, decisions, risk and what's still open. Newest first.
 
+## 2026-11-13 — Crash fix and pink live highlights (2355b2e..2063acd)
+
+**Scope delivered**
+- Fixed a crash on load introduced in b1a79ff: the app showed a blank screen for everyone until this push.
+- Changed the live highlight colour from gold to the brand pink, as requested.
+
+**Decisions and rationale**
+- The colour change is made once, in the shared colour setting, so every live element stays consistent.
+- Solid live buttons use the standard pink button (white text) for consistency and readable contrast.
+
+**Risk**
+- **Low:** "on stage" and "your dancer" now share one colour. They're still distinguished by border, label and name, but less so at a glance.
+- **Process:** the crash reached the develop branch because no test rendered the full app. A smoke test now covers this.
+
+**Still open:** unchanged from the previous entry (rules deployment, lock-screen push, rehearsal trial of listening assist).
+
 ## 2026-11-13 — Show-day redesign (b1a79ff..b1a79ff)
 
 **Scope delivered**

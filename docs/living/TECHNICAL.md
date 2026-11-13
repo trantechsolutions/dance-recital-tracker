@@ -2,6 +2,12 @@
 
 Files, data, architecture, tests and rollback. Newest first.
 
+## 2026-11-13 — Crash fix and pink live highlights (2355b2e..2063acd)
+
+- **Fix (2355b2e):** `App.jsx` read `recitalData` in the dependency list of the remember-show effect before `useLiveTracker` declared it, so every render threw `ReferenceError` (temporal dead zone). The effect now sits below the tracker call. New `src/__tests__/App.smoke.test.jsx` renders `<App />` signed out and signed in, with `useApp` and `useLiveTracker` mocked; it reproduces the original error when the fix is removed. `LoginScreen` footer copy updated.
+- **Style (2063acd):** in `tailwind.config.js`, the `stage` palette now uses the `brand` pink values and `shadow-stage` uses pink rgba. In `LiveBar`, `RunShow` and `AdminHome`, `bg-stage-400 text-ink-900 hover:bg-stage-300` became `bg-brand-600 text-white hover:bg-brand-700`; the radio accent and the `WorkspaceTab` CSV panel moved from amber to brand. Amber stays in `ConfirmModal` (warning), `DevToolsTab` and the unused `ShowsTab`.
+- **Tests:** 156 passing (12 files). **Rollback:** revert 2063acd (colours) and/or 2355b2e (fix; reverting it restores the crash).
+
 ## 2026-11-13 — Show-day redesign (b1a79ff..b1a79ff)
 
 52 files changed, +3,799 / −2,057.

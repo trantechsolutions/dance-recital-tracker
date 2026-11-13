@@ -2,6 +2,11 @@
 
 Plain-language notes for families, the studio and the board. Newest first.
 
+## 2026-11-13 — Crash fix and pink live highlights (2355b2e..2063acd)
+
+- **The app opens again.** The previous update stopped the app from loading. That's fixed.
+- **Live highlights are now pink**, matching the rest of the app: the act on stage, the bar at the bottom, and the buttons the studio uses to run the show. Your dancer's acts still show their name and a pink stripe, while the act on stage has a full pink border and says "On stage now".
+
 ## 2026-11-13 — Show-day redesign (b1a79ff..b1a79ff)
 
 **For families**
