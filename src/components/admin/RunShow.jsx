@@ -168,7 +168,7 @@ export default function RunShow({ recitalData, currentAct, actLog, updateActNumb
                     disabled={!tracking}
                     className={clsx(
                       "w-full grid grid-cols-[2.25rem_1fr_3.25rem_3rem] gap-2 items-center text-left text-sm px-2 py-2 rounded-md transition-colors",
-                      isNow ? "bg-stage-400 text-ink-900 font-semibold" : done ? "text-ink-500 hover:bg-ink-900" : "text-ink-100 hover:bg-ink-900",
+                      isNow ? "bg-brand-600 text-white font-semibold" : done ? "text-ink-500 hover:bg-ink-900" : "text-ink-100 hover:bg-ink-900",
                       !tracking && "cursor-default"
                     )}
                   >
@@ -247,7 +247,7 @@ export default function RunShow({ recitalData, currentAct, actLog, updateActNumb
               <button
                 onClick={startShow}
                 disabled={!ready || acts.length === 0}
-                className="h-24 rounded-2xl bg-stage-400 text-ink-900 text-2xl font-semibold hover:bg-stage-300 active:scale-[0.99] transition disabled:opacity-40"
+                className="h-24 rounded-2xl bg-brand-600 text-white text-2xl font-semibold hover:bg-brand-700 active:scale-[0.99] transition disabled:opacity-40"
               >
                 {ready && currentAct?.startedAt ? 'Resume the show' : 'Start the show'}
               </button>
@@ -264,7 +264,7 @@ export default function RunShow({ recitalData, currentAct, actLog, updateActNumb
               {next && (
                 <button
                   onClick={() => move(next)}
-                  className="h-28 rounded-2xl bg-stage-400 text-ink-900 hover:bg-stage-300 active:scale-[0.99] transition flex flex-col items-center justify-center gap-1"
+                  className="h-28 rounded-2xl bg-brand-600 text-white hover:bg-brand-700 active:scale-[0.99] transition flex flex-col items-center justify-center gap-1"
                 >
                   <span className="text-2xl font-semibold">Start the second half</span>
                   <span className="font-display italic text-lg">{next.number} {next.title}</span>
@@ -314,7 +314,7 @@ export default function RunShow({ recitalData, currentAct, actLog, updateActNumb
                   </button>
                   <button
                     onClick={next ? goNext : () => setConfirmEnd(true)}
-                    className="h-40 lg:h-32 flex flex-col items-center justify-center gap-1 rounded-2xl bg-stage-400 text-ink-900 hover:bg-stage-300 active:scale-[0.99] transition"
+                    className="h-40 lg:h-32 flex flex-col items-center justify-center gap-1 rounded-2xl bg-brand-600 text-white hover:bg-brand-700 active:scale-[0.99] transition"
                   >
                     <span className="text-3xl lg:text-2xl font-semibold">{next ? 'Next act' : 'End the show'}</span>
                     {next && <span className="font-display italic text-lg">{next.number} {next.title}</span>}
@@ -354,7 +354,7 @@ export default function RunShow({ recitalData, currentAct, actLog, updateActNumb
               ['auto', 'Move after a 5-second countdown'],
             ].map(([value, label]) => (
               <label key={value} className="flex items-center gap-3 text-sm min-h-[36px] cursor-pointer">
-                <input type="radio" name="assist-mode" value={value} checked={mode === value} onChange={() => setMode(value)} className="w-4 h-4 accent-amber-400" />
+                <input type="radio" name="assist-mode" value={value} checked={mode === value} onChange={() => setMode(value)} className="w-4 h-4 accent-pink-500" />
                 {label}
               </label>
             ))}
@@ -423,7 +423,7 @@ export default function RunShow({ recitalData, currentAct, actLog, updateActNumb
             <button onClick={() => { setProposal(null); assist.reset(); }} className="h-12 rounded-card border border-ink-600 font-semibold text-sm hover:bg-ink-800">
               Stay on {currentAct.number}
             </button>
-            <button onClick={() => move(activeProposal.to)} className="h-12 rounded-card bg-stage-400 text-ink-900 font-semibold text-sm hover:bg-stage-300">
+            <button onClick={() => move(activeProposal.to)} className="h-12 rounded-card bg-brand-600 text-white font-semibold text-sm hover:bg-brand-700">
               Move now
             </button>
           </div>

@@ -75,7 +75,7 @@ export default function LiveBar({ showData, showId, currentAct, actLog, favorite
           type="button"
           onClick={goToAct}
           aria-label={intermission ? 'Go to the next act' : 'Go to the act on stage'}
-          className="shrink-0 h-11 px-3 rounded-card bg-stage-400 text-ink-900 text-sm font-semibold flex items-center gap-1.5 hover:bg-stage-300 active:scale-95 transition"
+          className="shrink-0 h-11 px-3 rounded-card bg-brand-600 text-white text-sm font-semibold flex items-center gap-1.5 hover:bg-brand-700 active:scale-95 transition"
         >
           <LocateFixed size={16} />
           <span className={clsx(isAuthorized ? "hidden sm:inline" : "inline")}>Go to act</span>

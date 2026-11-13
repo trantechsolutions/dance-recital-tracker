@@ -60,7 +60,7 @@ export default function AdminHome({ recitalData, liveShowId }) {
                   to={`/admin/run/${show.id}`}
                   className={clsx(
                     "h-12 px-6 rounded-card font-semibold text-sm flex items-center justify-center transition-colors",
-                    live ? "bg-stage-400 text-ink-900 hover:bg-stage-300" : "bg-ink-900 dark:bg-white text-white dark:text-ink-900 hover:bg-ink-700"
+                    live ? "bg-brand-600 text-white hover:bg-brand-700" : "bg-ink-900 dark:bg-white text-white dark:text-ink-900 hover:bg-ink-700"
                   )}
                 >
                   {live ? 'Open the live show' : 'Run this show'}

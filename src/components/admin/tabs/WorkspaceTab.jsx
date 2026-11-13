@@ -738,9 +738,9 @@ export default function WorkspaceTab({
           <div className="space-y-4 min-w-0">
           {/* Bulk Import Panel */}
           {showBulkImport && (
-            <div className="bg-white dark:bg-ink-800 p-5 sm:p-6 rounded-card border-2 border-amber-400 dark:border-amber-600 shadow-xl animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-ink-800 p-5 sm:p-6 rounded-card border-2 border-brand-400 dark:border-brand-600 shadow-xl animate-in fade-in duration-200">
               <div className="flex items-start gap-3 mb-4">
-                <div className="p-2.5 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded-card shrink-0"><Upload size={20} /></div>
+                <div className="p-2.5 bg-brand-100 dark:bg-brand-900/30 text-brand-600 rounded-card shrink-0"><Upload size={20} /></div>
                 <div className="flex-1">
                   <h3 className="font-semibold dark:text-white">Bulk Import Shows & Acts</h3>
                   <p className="text-xs text-ink-400 mt-0.5">Upload a single CSV to create multiple shows at once.</p>
@@ -772,10 +772,10 @@ export default function WorkspaceTab({
                   ))}
                 </div>
               )}
-              <div className="border-2 border-dashed border-ink-200 dark:border-ink-700 rounded-card p-6 text-center hover:border-amber-400 transition-colors">
+              <div className="border-2 border-dashed border-ink-200 dark:border-ink-700 rounded-card p-6 text-center hover:border-brand-400 transition-colors">
                 <input type="file" accept=".csv" onChange={handleBulkImport} disabled={bulkImporting}
-                  className="mx-auto block text-sm text-ink-500 file:mr-3 file:py-2.5 file:px-6 file:rounded-card file:border-0 file:bg-amber-500 file:text-white file:font-bold file:text-sm file:cursor-pointer disabled:opacity-50" />
-                {bulkImporting && <p className="mt-3 text-xs font-bold text-amber-600 animate-pulse">Importing...</p>}
+                  className="mx-auto block text-sm text-ink-500 file:mr-3 file:py-2.5 file:px-6 file:rounded-card file:border-0 file:bg-brand-600 file:text-white file:font-bold file:text-sm file:cursor-pointer disabled:opacity-50" />
+                {bulkImporting && <p className="mt-3 text-xs font-bold text-brand-600 animate-pulse">Importing...</p>}
               </div>
             </div>
           )}
@@ -867,9 +867,9 @@ export default function WorkspaceTab({
               </div>
 
               {showUploadPanel && (
-                <div className="bg-amber-50 dark:bg-amber-900/10 p-5 rounded-card border border-amber-200 dark:border-amber-800/30 animate-in fade-in duration-200">
+                <div className="bg-brand-50 dark:bg-brand-900/10 p-5 rounded-card border border-brand-200 dark:border-brand-800/30 animate-in fade-in duration-200">
                   <div className="flex items-start gap-3">
-                    <Database size={20} className="text-amber-600 shrink-0 mt-0.5" />
+                    <Database size={20} className="text-brand-600 shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <h4 className="font-semibold text-sm dark:text-white mb-1">Batch Upload from CSV</h4>
                       <div className="flex items-center justify-between mb-3">
@@ -881,7 +881,7 @@ export default function WorkspaceTab({
                         </button>
                       </div>
                       <input type="file" accept=".csv" onChange={handleFileUpload}
-                        className="text-sm text-ink-500 file:mr-3 file:py-2 file:px-5 file:rounded-card file:border-0 file:bg-amber-500 file:text-white file:font-bold file:text-xs file:cursor-pointer" />
+                        className="text-sm text-ink-500 file:mr-3 file:py-2 file:px-5 file:rounded-card file:border-0 file:bg-brand-600 file:text-white file:font-bold file:text-xs file:cursor-pointer" />
                     </div>
                     <button onClick={() => setShowUploadPanel(false)} className="text-ink-400 hover:text-ink-600 p-1"><X size={16} /></button>
                   </div>
