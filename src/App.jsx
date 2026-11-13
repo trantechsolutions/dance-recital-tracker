@@ -76,12 +76,6 @@ export default function App() {
     if (fromUrl) return fromUrl;
     try { return localStorage.getItem('lastShow') || ''; } catch { return ''; }
   });
-  useEffect(() => {
-    try {
-      if (selectedShow) localStorage.setItem('lastShow', selectedShow);
-      else if (recitalData) localStorage.removeItem('lastShow');
-    } catch { /* private mode */ }
-  }, [selectedShow, recitalData]);
 
   // Family link (?code=…): keep the studio code for this visit (it survives the
   // sign-in step and a reload), drop it from the address bar, and let the code
@@ -112,6 +106,15 @@ export default function App() {
     recitalData, currentAct, actLog, loading, liveShowId,
     setRecitalData, invalidateActsCache, updateActNumber, setShowPhase, toggleTracking
   } = useLiveTracker(orgId, selectedShow, dataAccessReady);
+
+  // Remember the show on this device (after recitalData exists: the deps
+  // array is read during render, so it must come after the declaration).
+  useEffect(() => {
+    try {
+      if (selectedShow) localStorage.setItem('lastShow', selectedShow);
+      else if (recitalData) localStorage.removeItem('lastShow');
+    } catch { /* private mode */ }
+  }, [selectedShow, recitalData]);
 
   // 4. Handle deep-linked Organization (only on initial load).
   // Single-studio mode ignores ?org= — the tenant is resolved by AppContext.

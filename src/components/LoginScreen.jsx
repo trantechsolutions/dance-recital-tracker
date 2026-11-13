@@ -139,7 +139,7 @@ export default function LoginScreen({ onSkip, codeStep }) {
           </div>
 
           <p className="text-center text-[11px] text-ink-400 font-medium pt-1">
-            Sign in to save and sync favorites across devices
+            Your dancers and notes are saved to your account
           </p>
         </div>
       </div>
