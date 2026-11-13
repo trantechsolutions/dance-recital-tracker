@@ -2,6 +2,11 @@
 
 Files, data, architecture, tests and rollback. Newest first.
 
+## 2026-11-13 — Firebase CLI config and main sync (5a049ea..7a89252)
+
+- **5a049ea:** add `firebase.json` (rules path) and `.firebaserc` (default project `dance-recital-tracker`). A dry run compiled `firestore.rules` successfully.
+- **7a89252:** merge `origin/main` into develop before release. It brings PRs #3–#5 (move up/down buttons), which only change `src/components/admin/tabs/ShowsTab.jsx`; that component isn't imported anywhere, so the buttons aren't visible in the app. No conflicts; 156 tests pass.
+
 ## 2026-11-13 — Crash fix and pink live highlights (2355b2e..2063acd)
 
 - **Fix (2355b2e):** `App.jsx` read `recitalData` in the dependency list of the remember-show effect before `useLiveTracker` declared it, so every render threw `ReferenceError` (temporal dead zone). The effect now sits below the tracker call. New `src/__tests__/App.smoke.test.jsx` renders `<App />` signed out and signed in, with `useApp` and `useLiveTracker` mocked; it reproduces the original error when the fix is removed. `LoginScreen` footer copy updated.
