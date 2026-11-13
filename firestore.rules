@@ -1,0 +1,168 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Who is who ───────────────────────────────────────────────────────────
+    // Collections come in pairs: live ("shows", "organizations") and dev/preview
+    // ("test_shows", "test_organizations"). Every helper takes the prefix `p`
+    // ('' or 'test_') so one set of rules covers both.
+
+    function isSuperAdmin() {
+      return request.auth != null && (
+        request.auth.token.email == "jonny5v@gmail.com"
+      );
+    }
+
+    function signedIn() { return request.auth != null; }
+    function myEmail() { return request.auth.token.email; }
+
+    function orgPath(p, orgId) {
+      return /databases/$(database)/documents/$(p + 'organizations')/$(orgId);
+    }
+    function showPath(p, showId) {
+      return /databases/$(database)/documents/$(p + 'shows')/$(showId);
+    }
+
+    // Studio admin: the super admin, or an email in the studio's `admins`.
+    function isOrgAdmin(p, orgId) {
+      return isSuperAdmin() || (
+        signedIn() && orgId is string && exists(orgPath(p, orgId)) &&
+        myEmail() in get(orgPath(p, orgId)).data.get('admins', [])
+      );
+    }
+
+    // May move acts / pause / end this show: studio admins, or a show runner
+    // given this show (an empty list in `runnerShows` means every show).
+    function canRunShow(p, orgId, showId) {
+      return isOrgAdmin(p, orgId) || (
+        signedIn() && orgId is string && exists(orgPath(p, orgId)) &&
+        myEmail() in get(orgPath(p, orgId)).data.get('runnerShows', {}) &&
+        (get(orgPath(p, orgId)).data.runnerShows[myEmail()].size() == 0 ||
+         showId in get(orgPath(p, orgId)).data.runnerShows[myEmail()])
+      );
+    }
+
+    // The studio a show belongs to, as stored on the show (after this write,
+    // so a show created in the same batch counts).
+    function orgOfShowAfter(p, showId) {
+      return getAfter(showPath(p, showId)).data.org_id;
+    }
+
+    // Studio admins may change who can get in and who can help — nothing else
+    // on the studio document (name, slug and deletion stay super-admin only).
+    function onlyAccessFieldsChange() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['studioCode', 'admins', 'showRunners', 'runnerShows']);
+    }
+
+    // ── Organizations ────────────────────────────────────────────────────────
+    // Read stays PUBLIC: the pre-login studio-code screen reads the org doc to
+    // get `studioCode` (and the org name) before the visitor authenticates.
+    match /{orgCollection}/{orgId} {
+      allow read: if (orgCollection == "organizations" || orgCollection == "test_organizations");
+      allow create, delete: if (orgCollection == "organizations" || orgCollection == "test_organizations")
+                   && isSuperAdmin();
+      allow update: if (orgCollection == "organizations" || orgCollection == "test_organizations")
+                   && (isSuperAdmin() || (
+                        isOrgAdmin(orgCollection == "test_organizations" ? 'test_' : '', orgId) &&
+                        onlyAccessFieldsChange()));
+    }
+
+    // ── Shows ── read: any signed-in user. Write: that studio's admins.
+    match /shows/{showId} {
+      allow read: if signedIn();
+      allow create: if isOrgAdmin('', request.resource.data.org_id);
+      allow update: if isSuperAdmin() || (
+                    isOrgAdmin('', resource.data.org_id) &&
+                    request.resource.data.org_id == resource.data.org_id);
+      allow delete: if isOrgAdmin('', resource.data.org_id);
+    }
+    match /test_shows/{showId} {
+      allow read: if signedIn();
+      allow create: if isOrgAdmin('test_', request.resource.data.org_id);
+      allow update: if isSuperAdmin() || (
+                    isOrgAdmin('test_', resource.data.org_id) &&
+                    request.resource.data.org_id == resource.data.org_id);
+      allow delete: if isOrgAdmin('test_', resource.data.org_id);
+    }
+
+    // ── Acts ── read: any signed-in user (performer names live here).
+    // Write: admins of the studio that owns the act's show.
+    match /acts/{actId} {
+      allow read: if signedIn();
+      allow create, update: if isSuperAdmin() || (
+                    existsAfter(showPath('', request.resource.data.show_id))
+                  ) && isOrgAdmin('', orgOfShowAfter('', request.resource.data.show_id));
+      allow delete: if isSuperAdmin() || (
+                    exists(showPath('', resource.data.show_id)) &&
+                    isOrgAdmin('', get(showPath('', resource.data.show_id)).data.org_id));
+    }
+    match /test_acts/{actId} {
+      allow read: if signedIn();
+      allow create, update: if isSuperAdmin() || (
+                    existsAfter(showPath('test_', request.resource.data.show_id))
+                  ) && isOrgAdmin('test_', orgOfShowAfter('test_', request.resource.data.show_id));
+      allow delete: if isSuperAdmin() || (
+                    exists(showPath('test_', resource.data.show_id)) &&
+                    isOrgAdmin('test_', get(showPath('test_', resource.data.show_id)).data.org_id));
+    }
+
+    // ── Show status / live tracking ── (doc id = show id)
+    // Write: admins and show runners of the studio that owns the show. The
+    // org_id written must match the show's real studio, so it can't be forged.
+    match /show_status/{showId} {
+      allow read: if signedIn();
+      allow create, update: if existsAfter(showPath('', showId)) &&
+                    request.resource.data.org_id == orgOfShowAfter('', showId) &&
+                    canRunShow('', request.resource.data.org_id, showId);
+      allow delete: if isOrgAdmin('', resource.data.org_id);
+    }
+    match /test_show_status/{showId} {
+      allow read: if signedIn();
+      allow create, update: if existsAfter(showPath('test_', showId)) &&
+                    request.resource.data.org_id == orgOfShowAfter('test_', showId) &&
+                    canRunShow('test_', request.resource.data.org_id, showId);
+      allow delete: if isOrgAdmin('test_', resource.data.org_id);
+    }
+
+    // ── User Profiles ──
+    match /user_profiles/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (
+        request.auth.uid == userId ||
+        request.auth.token.email == "jonny5v@gmail.com"
+      );
+    }
+    match /test_user_profiles/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (
+        request.auth.uid == userId ||
+        request.auth.token.email == "jonny5v@gmail.com"
+      );
+    }
+
+    // ── Seed manifest (note: dev prefix makes it test__seed_manifest, double underscore) ──
+    match /_seed_manifest/{docId} {
+      allow read, write: if request.auth != null &&
+        request.auth.token.email == "jonny5v@gmail.com";
+    }
+    match /test__seed_manifest/{docId} {
+      allow read, write: if request.auth != null &&
+        request.auth.token.email == "jonny5v@gmail.com";
+    }
+
+    // Full-name access allowlist — read by any signed-in user, written only by super admins.
+    // Email list must match VITE_AUTHORIZED_ADMINS (Firestore can't read env vars).
+    match /app_config/name_access {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.auth.token.email in ['jonny5v@gmail.com'];
+    }
+    match /test_app_config/name_access {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.auth.token.email in ['jonny5v@gmail.com'];
+    }
+
+  }
+}

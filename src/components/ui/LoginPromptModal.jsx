@@ -30,9 +30,9 @@ export default function LoginPromptModal({ isOpen, onClose, onGoToSettings }) {
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold dark:text-white mb-1">Sign in to save favorites</h2>
+            <h2 className="text-xl font-semibold dark:text-white mb-1">Sign in to follow your dancer</h2>
             <p className="text-ink-500 dark:text-ink-400 text-sm leading-relaxed">
-              Create a free account to save your favorite acts and dancers across devices.
+              Create a free account so the dancers you follow and the acts you save are on every phone.
             </p>
           </div>
 

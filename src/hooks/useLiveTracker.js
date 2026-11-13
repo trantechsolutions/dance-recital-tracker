@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { db, coll } from '../firebase';
 import {
-  collection, query, where, getDocs, doc, setDoc, onSnapshot
+  collection, query, where, getDocs, doc, setDoc, onSnapshot, arrayUnion
 } from 'firebase/firestore';
 
 export function useLiveTracker(orgId, selectedShowId, enabled = true) {
@@ -9,6 +9,9 @@ export function useLiveTracker(orgId, selectedShowId, enabled = true) {
   const [currentAct, setCurrentAct] = useState({ number: null, title: '', isTracking: false });
   const [loading, setLoading] = useState(true);
   const [liveShowId, setLiveShowId] = useState(null);
+  // Every act change for the selected show: [{ number, at }]. Feeds the
+  // booth's start/ran columns and, later, real minute estimates for parents.
+  const [actLog, setActLog] = useState([]);
 
   // Cache of already-fetched acts keyed by showId, so snapshot re-fires don't
   // re-fetch acts for shows whose IDs haven't changed.
@@ -103,20 +106,6 @@ export function useLiveTracker(orgId, selectedShowId, enabled = true) {
 
         setRecitalData(data);
 
-        // Parallel check for any live show
-        try {
-          const statusResults = await Promise.all(
-            shows.map(show =>
-              getDocs(query(
-                collection(db, coll('show_status')),
-                where('show_id', '==', show.id),
-                where('is_tracking', '==', true)
-              ))
-            )
-          );
-          const liveIndex = statusResults.findIndex(snap => !snap.empty);
-          setLiveShowId(liveIndex !== -1 ? shows[liveIndex].id : null);
-        } catch { /* non-critical */ }
       } catch (err) {
         console.error("Firestore Program Error:", err);
       } finally {
@@ -130,13 +119,28 @@ export function useLiveTracker(orgId, selectedShowId, enabled = true) {
       setLoading(false);
     });
 
-    return () => unsubShows();
+    // Which show is live right now. A listener (not a one-off read) so a show
+    // starting or stopping reaches every open phone without a reload.
+    const liveQuery = query(
+      collection(db, coll('show_status')),
+      where('org_id', '==', orgId),
+      where('is_tracking', '==', true)
+    );
+    const unsubLive = onSnapshot(liveQuery, (snap) => {
+      const first = snap.docs?.[0];
+      setLiveShowId(first ? (first.data().show_id || first.id) : null);
+    }, (err) => {
+      console.warn('Firestore live-show subscription error:', err?.message || err);
+    });
+
+    return () => { unsubShows(); unsubLive?.(); };
   }, [orgId, enabled]);
 
   // 2. Listen for "Now Performing" status for the specific show
   useEffect(() => {
     if (!orgId || !selectedShowId || !recitalData || !recitalData[selectedShowId]) {
       setCurrentAct({ number: null, title: '', isTracking: false });
+      setActLog([]);
       return;
     }
 
@@ -145,6 +149,7 @@ export function useLiveTracker(orgId, selectedShowId, enabled = true) {
     const unsubStatus = onSnapshot(statusRef, (snap) => {
       if (!snap.exists()) {
         setCurrentAct({ number: 1, title: 'Not Started', isTracking: false });
+        setActLog([]);
         return;
       }
 
@@ -155,8 +160,11 @@ export function useLiveTracker(orgId, selectedShowId, enabled = true) {
       setCurrentAct({
         number: statusData.current_act_number,
         title: act ? act.title : 'Act not found',
-        isTracking: statusData.is_tracking || false
+        isTracking: statusData.is_tracking || false,
+        startedAt: statusData.act_started_at || null,
+        phase: statusData.phase || null,
       });
+      setActLog(Array.isArray(statusData.act_log) ? statusData.act_log : []);
     }, (err) => {
       // Non-critical: a rejected status listener just leaves currentAct stale.
       console.warn("Firestore Status subscription error:", err?.message || err);
@@ -169,12 +177,32 @@ export function useLiveTracker(orgId, selectedShowId, enabled = true) {
   const updateActNumber = async (num) => {
     if (!orgId || !selectedShowId) return;
 
+    const now = new Date().toISOString();
     await setDoc(doc(db, coll('show_status'), selectedShowId), {
       show_id: selectedShowId,
       org_id: orgId,
       current_act_number: num,
       is_tracking: true,
-      updated_at: new Date().toISOString()
+      act_started_at: now,
+      act_log: arrayUnion({ number: num, at: now }),
+      phase: null,
+      updated_at: now
+    }, { merge: true });
+  };
+
+  // Intermission keeps the show live for parents (their place in the running
+  // order and countdowns stay put); ending stops it and says so.
+  const setShowPhase = async (phase) => {
+    if (!orgId || !selectedShowId) return;
+    const now = new Date().toISOString();
+    await setDoc(doc(db, coll('show_status'), selectedShowId), {
+      show_id: selectedShowId,
+      org_id: orgId,
+      phase,
+      is_tracking: phase !== 'ended',
+      ...(phase === 'intermission' ? { intermission_at: now } : {}),
+      ...(phase === 'ended' ? { ended_at: now } : {}),
+      updated_at: now
     }, { merge: true });
   };
 
@@ -196,11 +224,13 @@ export function useLiveTracker(orgId, selectedShowId, enabled = true) {
   return {
     recitalData,
     currentAct,
+    actLog,
     loading,
     liveShowId,
     setRecitalData,
     invalidateActsCache,
     updateActNumber,
+    setShowPhase,
     toggleTracking
   };
 }

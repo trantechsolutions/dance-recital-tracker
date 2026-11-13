@@ -7,11 +7,14 @@ import {
   Trash2, ChevronDown, ChevronRight, Settings, KeyRound
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { Link } from 'react-router-dom';
+import { backToBackDancers } from '../../../utils/showControl';
+import { displayName } from '../../../utils/names';
 import Papa from 'papaparse';
 import PerformerEditor from '../PerformerEditor';
 import {
   saveShow, createShow, uploadActsForShow, bulkImportShows,
-  createOrg, updateOrgAdmins, updateOrgName, updateOrgStudioCode, generateStudioCode, revokeAllStudioAccess, deleteStudio, deleteShow,
+  createOrg, updateOrgName, updateOrgStudioCode, generateStudioCode, revokeAllStudioAccess, deleteStudio, deleteShow,
 } from '../../../services/showService';
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor,
@@ -218,38 +221,15 @@ function ManageStudioAccordion({ orgData, setOrgData, showToast, setPromptModal,
   const { orgId, setOrgId, setOrgName } = useApp();
   const [expanded, setExpanded] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
-  const [codeDraft, setCodeDraft] = useState('');
-  const [newAdminEmail, setNewAdminEmail] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteLog, setDeleteLog] = useState([]);
 
   // Keep the drafts in sync when the org doc (re)loads
   useEffect(() => { setNameDraft(orgData.name || ''); }, [orgData.name]);
-  useEffect(() => { setCodeDraft(orgData.studioCode || ''); }, [orgData.studioCode]);
 
   if (!orgId) return null;
 
   const normalizedCode = (orgData.studioCode || '').trim().toLowerCase();
-
-  const handleSaveStudioCode = async () => {
-    const next = codeDraft.trim().toLowerCase();
-    if (next === normalizedCode) return;
-    try {
-      await updateOrgStudioCode(orgId, next);
-      setOrgData({ ...orgData, studioCode: next });
-      showToast(next ? 'Studio code saved' : 'Studio code removed', 'success');
-    } catch (e) { showToast(e.message, 'error'); }
-  };
-
-  const handleGenerateCode = async () => {
-    const code = generateStudioCode();
-    try {
-      await updateOrgStudioCode(orgId, code);
-      setOrgData({ ...orgData, studioCode: code });
-      setCodeDraft(code);
-      showToast(`New studio code: ${code.toUpperCase()}`, 'success');
-    } catch (e) { showToast(e.message, 'error'); }
-  };
 
   // Revoke is a full reset: clear every account's access AND issue a fresh code,
   // so the old (now widely-shared) code stops working.
@@ -267,7 +247,6 @@ function ManageStudioAccordion({ orgData, setOrgData, showToast, setPromptModal,
           const code = generateStudioCode();
           await updateOrgStudioCode(orgId, code);
           setOrgData({ ...orgData, studioCode: code });
-          setCodeDraft(code);
           showToast(`Revoked ${count} account${count !== 1 ? 's' : ''}. New code: ${code.toUpperCase()}`, 'success');
         } catch (e) { showToast(e.message, 'error'); }
       },
@@ -283,14 +262,6 @@ function ManageStudioAccordion({ orgData, setOrgData, showToast, setPromptModal,
       setOrgData({ ...orgData, name });
       if (setOrgName) setOrgName(name); // sidebar/header pick up the new name immediately
       showToast('Studio renamed', 'success');
-    } catch (e) { showToast(e.message, 'error'); }
-  };
-
-  const handleUpdateAdmins = async (newAdmins) => {
-    try {
-      await updateOrgAdmins(orgId, newAdmins);
-      setOrgData({ ...orgData, admins: newAdmins });
-      showToast('Admins updated', 'success');
     } catch (e) { showToast(e.message, 'error'); }
   };
 
@@ -364,105 +335,19 @@ function ManageStudioAccordion({ orgData, setOrgData, showToast, setPromptModal,
             </p>
           </div>
 
-          {/* Studio Code Section */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <KeyRound size={13} className="text-ink-400" />
-              <label className="text-[10px] font-semibold uppercase text-ink-400 tracking-widest">
-                Studio Code
-              </label>
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="XXXX-XXXX (or click Generate)"
-                autoCapitalize="none"
-                spellCheck={false}
-                className="flex-1 min-w-0 bg-ink-50 dark:bg-ink-900 p-3 rounded-card dark:text-white border border-ink-200 dark:border-ink-700 outline-none focus:border-brand-500 text-sm font-bold font-mono tracking-wider uppercase placeholder:normal-case"
-                value={codeDraft}
-                onChange={e => setCodeDraft(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleSaveStudioCode(); }}
-              />
-              <button
-                onClick={handleGenerateCode}
-                title="Generate a new random code"
-                className="inline-flex items-center gap-1.5 bg-ink-100 dark:bg-ink-700 text-ink-700 dark:text-white px-4 rounded-card font-bold text-sm hover:bg-ink-200 dark:hover:bg-ink-600 transition-colors shrink-0"
-              >
-                <RefreshCw size={14} /> Generate
-              </button>
-              <button
-                onClick={handleSaveStudioCode}
-                disabled={codeDraft.trim().toLowerCase() === normalizedCode}
-                className="bg-brand-600 text-white px-5 rounded-card font-bold text-sm hover:bg-brand-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-              >
-                Save
-              </button>
-            </div>
-            <p className="text-[10px] text-ink-400 mt-1.5">
-              {normalizedCode
-                ? <>Families enter this code once after signing in; access then sticks to their account. Case-insensitive.</>
-                : <>No code set — signed-in users go straight to the program. Add one to gate the share link.</>}
+          {/* Studio code, family link and admins live on the Access page */}
+          <div className="space-y-3">
+            <p className="text-sm text-ink-600 dark:text-ink-300">
+              The studio code, family link, admins and show runners are on <Link to="/admin/access" className="font-semibold underline">Access and show runners</Link>.
             </p>
             {normalizedCode && (
               <button
                 onClick={handleResetAccess}
-                className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-card text-xs font-bold text-red-600 bg-red-50 dark:bg-red-900/15 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-card text-xs font-bold text-red-600 bg-red-50 dark:bg-red-900/15 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
               >
                 <Trash2 size={13} /> Revoke all access (re-prompt everyone)
               </button>
             )}
-          </div>
-
-          {/* Admins Section */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <Shield size={13} className="text-ink-400" />
-              <label className="text-[10px] font-semibold uppercase text-ink-400 tracking-widest">
-                Administrators
-              </label>
-            </div>
-            <div className="space-y-2 mb-3">
-              {(orgData.admins || []).map(email => (
-                <div key={email} className="flex justify-between items-center bg-ink-50 dark:bg-ink-900 p-3 rounded-card border border-ink-100 dark:border-ink-800">
-                  <span className="font-bold text-sm dark:text-white">{email}</span>
-                  <button
-                    onClick={() => handleUpdateAdmins(orgData.admins.filter(e => e !== email))}
-                    className="text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded-lg transition-colors"
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              ))}
-              {(orgData.admins || []).length === 0 && (
-                <p className="text-xs text-ink-400 py-1">No admins configured.</p>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="email"
-                placeholder="Add admin email..."
-                className="flex-1 bg-ink-50 dark:bg-ink-900 p-3 rounded-card dark:text-white border border-ink-200 dark:border-ink-700 outline-none focus:border-brand-500 text-sm"
-                value={newAdminEmail}
-                onChange={e => setNewAdminEmail(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && newAdminEmail.trim()) {
-                    handleUpdateAdmins([...(orgData.admins || []), newAdminEmail.trim()]);
-                    setNewAdminEmail('');
-                  }
-                }}
-              />
-              <button
-                onClick={() => {
-                  if (newAdminEmail.trim()) {
-                    handleUpdateAdmins([...(orgData.admins || []), newAdminEmail.trim()]);
-                    setNewAdminEmail('');
-                  }
-                }}
-                className="bg-ink-200 dark:bg-ink-700 text-ink-700 dark:text-white px-5 rounded-card font-bold text-sm hover:bg-ink-300 transition-colors"
-              >
-                Add
-              </button>
-            </div>
           </div>
 
           {/* Danger Zone — multi-studio only: deleting the sole tenant would brick the app */}
@@ -525,11 +410,12 @@ function ManageStudioAccordion({ orgData, setOrgData, showToast, setPromptModal,
 
 export default function WorkspaceTab({
   recitalData, setRecitalData, invalidateActsCache,
-  currentAct, updateActNumber, toggleTracking,
-  setSelectedShow, showToast, setShowNightMode,
+  currentAct,
+  setSelectedShow, showToast,
   selectedShowId, setSelectedShowId, editData, setEditData,
   orgData, setOrgData,
   setPromptModal,
+  isDirty, onDiscard,
 }) {
   const { orgId } = useApp();
 
@@ -581,6 +467,7 @@ export default function WorkspaceTab({
       await saveShow(orgId, editData.id, label, cleanedActs);
       invalidateActsCache(editData.id);
       setRecitalData(prev => ({ ...prev, [editData.id]: { ...editData, label, acts: cleanedActs } }));
+      setEditData({ ...editData, label, acts: cleanedActs });
       showToast('Changes saved', 'success');
     } catch (err) { showToast(err.message, 'error'); }
   };
@@ -753,43 +640,107 @@ export default function WorkspaceTab({
 
       {/* ── Shows & Acts Workspace ── */}
       {orgId && (
-        <div className="space-y-4">
+        <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-[minmax(240px,300px)_1fr] lg:gap-8 lg:items-start">
+          <div className="space-y-3 lg:sticky lg:top-6">
           {/* Shows Header */}
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-semibold dark:text-white">Shows & Acts</h2>
-            </div>
+          <div className="flex justify-between items-center gap-2">
+            <h3 className="font-semibold dark:text-white">Shows</h3>
             <div className="flex gap-2">
               <button
                 onClick={() => { setShowBulkImport(!showBulkImport); setIsAddingShow(false); }}
+                aria-pressed={showBulkImport}
                 className={clsx(
-                  "flex items-center gap-2 px-4 py-2.5 rounded-card font-bold text-sm transition-all active:scale-95",
-                  showBulkImport
-                    ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
-                    : "bg-ink-100 dark:bg-ink-700 text-ink-600 dark:text-ink-300 hover:bg-ink-200 dark:hover:bg-ink-600"
+                  "h-10 px-3 flex items-center gap-1.5 rounded-card text-sm transition-colors",
+                  showBulkImport ? "bg-ink-900 dark:bg-white text-white dark:text-ink-900" : "border border-ink-300 dark:border-ink-600 text-ink-700 dark:text-ink-200 hover:bg-ink-100 dark:hover:bg-ink-700"
                 )}
               >
-                <Upload size={15} /> <span className="hidden sm:inline">Bulk Import</span>
+                <Upload size={15} /> Import
               </button>
               <button
                 onClick={() => { setIsAddingShow(!isAddingShow); setSelectedShowId(''); setShowBulkImport(false); }}
+                aria-pressed={isAddingShow}
                 className={clsx(
-                  "flex items-center gap-2 px-5 py-2.5 rounded-card font-bold text-sm transition-all active:scale-95",
-                  isAddingShow
-                    ? "bg-ink-200 dark:bg-ink-700 text-ink-600 dark:text-ink-300"
-                    : "bg-brand-600 text-white shadow-lg shadow-brand-500/20"
+                  "h-10 px-3 flex items-center gap-1.5 rounded-card text-sm font-semibold transition-colors",
+                  isAddingShow ? "border border-ink-300 dark:border-ink-600 text-ink-700 dark:text-ink-200" : "bg-ink-900 dark:bg-white text-white dark:text-ink-900"
                 )}
               >
-                {isAddingShow ? <><X size={17} /> Cancel</> : <><Plus size={17} /> New Show</>}
+                {isAddingShow ? <><X size={16} /> Cancel</> : <><Plus size={16} /> New show</>}
               </button>
             </div>
           </div>
 
+          {/* Show Cards Grid */}
+          {showList.length > 0 && (
+            <div className="grid grid-cols-1 gap-2">
+              {showList.map(show => {
+                const isSelected = selectedShowId === show.id;
+                const isDeleting = deletingShowId === show.id;
+                return (
+                  <div key={show.id} className="relative group">
+                    <button onClick={() => {
+                      const newId = isSelected ? '' : show.id;
+                      setSelectedShowId(newId);
+                      if (setSelectedShow) setSelectedShow(newId);
+                    }}
+                      disabled={isDeleting}
+                      aria-pressed={isSelected}
+                      className={clsx(
+                        "w-full text-left px-4 py-3 rounded-card bg-white dark:bg-ink-800 transition-colors",
+                        isDeleting && "opacity-50 pointer-events-none",
+                        isSelected
+                          ? "border-2 border-ink-900 dark:border-white"
+                          : "border border-ink-200 dark:border-ink-700 hover:border-ink-400 dark:hover:border-ink-500"
+                      )}>
+                      <div className="flex justify-between items-start">
+                        <div className="min-w-0 flex-1 pr-8">
+                          <div className="font-semibold truncate dark:text-white">{show.label}</div>
+                          {formatShowDate(show.id) && (
+                            <div className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">{formatShowDate(show.id)}</div>
+                          )}
+                          <div className="text-xs text-ink-500 dark:text-ink-400 mt-1">
+                            {show.acts?.length || 0} acts, {new Set(show.acts?.flatMap(a => a.performers || [])).size} dancers
+                          </div>
+                        </div>
+
+                      </div>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); promptDeleteShow(show); }}
+                      disabled={isDeleting}
+                      title="Delete show"
+                      aria-label={`Delete ${show.label}`}
+                      className="absolute top-1/2 -translate-y-1/2 right-2 w-10 h-10 flex items-center justify-center rounded-card text-ink-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors z-10 disabled:opacity-50 disabled:cursor-wait"
+                    >
+                      {isDeleting
+                        ? <RefreshCw size={16} className="animate-spin" />
+                        : <Trash2 size={16} />}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Empty Shows State */}
+          {!isAddingShow && showList.length === 0 && (
+            <div className="text-center py-14 bg-white dark:bg-ink-800 rounded-card border-2 border-dashed border-ink-200 dark:border-ink-700">
+              <Calendar size={44} className="mx-auto text-ink-200 dark:text-ink-700 mb-4" />
+              <h3 className="text-lg font-semibold dark:text-white mb-1">No Shows Yet</h3>
+              <p className="text-ink-400 text-sm mb-4">Create your first performance to start adding acts.</p>
+              <button onClick={() => setIsAddingShow(true)} className="inline-flex items-center gap-2 px-5 py-3 bg-brand-600 text-white rounded-card font-bold text-sm shadow-lg shadow-brand-500/20">
+                <Plus size={16} /> Create First Show
+              </button>
+            </div>
+          )}
+
+          </div>
+
+          <div className="space-y-4 min-w-0">
           {/* Bulk Import Panel */}
           {showBulkImport && (
-            <div className="bg-white dark:bg-ink-800 p-5 sm:p-6 rounded-card border-2 border-amber-400 dark:border-amber-600 shadow-xl animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-ink-800 p-5 sm:p-6 rounded-card border-2 border-brand-400 dark:border-brand-600 shadow-xl animate-in fade-in duration-200">
               <div className="flex items-start gap-3 mb-4">
-                <div className="p-2.5 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded-card shrink-0"><Upload size={20} /></div>
+                <div className="p-2.5 bg-brand-100 dark:bg-brand-900/30 text-brand-600 rounded-card shrink-0"><Upload size={20} /></div>
                 <div className="flex-1">
                   <h3 className="font-semibold dark:text-white">Bulk Import Shows & Acts</h3>
                   <p className="text-xs text-ink-400 mt-0.5">Upload a single CSV to create multiple shows at once.</p>
@@ -821,10 +772,10 @@ export default function WorkspaceTab({
                   ))}
                 </div>
               )}
-              <div className="border-2 border-dashed border-ink-200 dark:border-ink-700 rounded-card p-6 text-center hover:border-amber-400 transition-colors">
+              <div className="border-2 border-dashed border-ink-200 dark:border-ink-700 rounded-card p-6 text-center hover:border-brand-400 transition-colors">
                 <input type="file" accept=".csv" onChange={handleBulkImport} disabled={bulkImporting}
-                  className="mx-auto block text-sm text-ink-500 file:mr-3 file:py-2.5 file:px-6 file:rounded-card file:border-0 file:bg-amber-500 file:text-white file:font-bold file:text-sm file:cursor-pointer disabled:opacity-50" />
-                {bulkImporting && <p className="mt-3 text-xs font-bold text-amber-600 animate-pulse">Importing...</p>}
+                  className="mx-auto block text-sm text-ink-500 file:mr-3 file:py-2.5 file:px-6 file:rounded-card file:border-0 file:bg-brand-600 file:text-white file:font-bold file:text-sm file:cursor-pointer disabled:opacity-50" />
+                {bulkImporting && <p className="mt-3 text-xs font-bold text-brand-600 animate-pulse">Importing...</p>}
               </div>
             </div>
           )}
@@ -859,154 +810,29 @@ export default function WorkspaceTab({
             </div>
           )}
 
-          {/* Show Cards Grid */}
-          {!isAddingShow && showList.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {showList.map(show => {
-                const isSelected = selectedShowId === show.id;
-                const isDeleting = deletingShowId === show.id;
-                return (
-                  <div key={show.id} className="relative group">
-                    <button onClick={() => {
-                      const newId = isSelected ? '' : show.id;
-                      setSelectedShowId(newId);
-                      if (setSelectedShow) setSelectedShow(newId);
-                    }}
-                      disabled={isDeleting}
-                      className={clsx(
-                        "w-full text-left p-5 rounded-2xl border-2 transition-all",
-                        isDeleting && "opacity-50 pointer-events-none",
-                        isSelected
-                          ? "border-pink-500 bg-pink-50 dark:bg-pink-900/20 shadow-md"
-                          : "border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-pink-300 dark:hover:border-pink-700 hover:shadow-sm"
-                      )}>
-                      <div className="flex justify-between items-start">
-                        <div className="min-w-0 flex-1 pr-8">
-                          <div className={clsx("font-black truncate", isSelected ? "text-pink-600" : "dark:text-white")}>{show.label}</div>
-                          {formatShowDate(show.id) && (
-                            <div className="text-[10px] font-bold text-slate-400 mt-0.5 flex items-center gap-1"><Calendar size={10} /> {formatShowDate(show.id)}</div>
-                          )}
-                          <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400 font-bold">
-                            <span className="flex items-center gap-1"><Hash size={12} /> {show.acts?.length || 0} acts</span>
-                            <span className="flex items-center gap-1"><Users size={12} /> {new Set(show.acts?.flatMap(a => a.performers || [])).size} dancers</span>
-                          </div>
-                        </div>
-                        {/* mr-10 reserves the top-right slot for the absolutely-positioned delete button */}
-                        <div className={clsx("p-2 rounded-xl transition-colors shrink-0 mr-10", isSelected ? "bg-pink-600 text-white" : "bg-slate-50 dark:bg-slate-900 text-slate-300 group-hover:text-pink-500")}>
-                          <Pencil size={16} />
-                        </div>
-                      </div>
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); promptDeleteShow(show); }}
-                      disabled={isDeleting}
-                      title="Delete show"
-                      aria-label={`Delete ${show.label}`}
-                      className="absolute top-5 right-5 p-2 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors z-10 disabled:opacity-50 disabled:cursor-wait"
-                    >
-                      {isDeleting
-                        ? <RefreshCw size={16} className="animate-spin" />
-                        : <Trash2 size={16} />}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+
+          {!editData && !isAddingShow && !showBulkImport && showList.length > 0 && (
+            <p className="hidden lg:block p-6 rounded-card border border-dashed border-ink-300 dark:border-ink-600 text-ink-600 dark:text-ink-300">
+              Pick a show on the left to edit its running order.
+            </p>
           )}
 
-          {/* Empty Shows State */}
-          {!isAddingShow && showList.length === 0 && (
-            <div className="text-center py-14 bg-white dark:bg-ink-800 rounded-card border-2 border-dashed border-ink-200 dark:border-ink-700">
-              <Calendar size={44} className="mx-auto text-ink-200 dark:text-ink-700 mb-4" />
-              <h3 className="text-lg font-semibold dark:text-white mb-1">No Shows Yet</h3>
-              <p className="text-ink-400 text-sm mb-4">Create your first performance to start adding acts.</p>
-              <button onClick={() => setIsAddingShow(true)} className="inline-flex items-center gap-2 px-5 py-3 bg-brand-600 text-white rounded-card font-bold text-sm shadow-lg shadow-brand-500/20">
-                <Plus size={16} /> Create First Show
-              </button>
-            </div>
-          )}
-
-          {/* Live Tracker Control */}
+          {/* Running the show lives on its own screen now */}
           {selectedShowId && editData && (
-            <div className="bg-white dark:bg-ink-800 rounded-card border border-ink-200 dark:border-ink-700 overflow-hidden animate-in fade-in">
-              <div className="p-4 sm:p-5 flex items-center justify-between border-b border-ink-100 dark:border-ink-700">
-                <div className="flex items-center gap-3">
-                  <div className={clsx("p-2.5 rounded-card", currentAct?.isTracking && currentAct?.number ? "bg-red-100 dark:bg-red-900/30 text-red-500" : "bg-ink-100 dark:bg-ink-900 text-ink-400")}>
-                    <Radio size={18} className={currentAct?.isTracking ? "animate-pulse" : ""} />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-sm dark:text-white">Live Tracker</h3>
-                    <p className="text-[10px] font-bold text-ink-400">
-                      {currentAct?.isTracking ? 'Broadcasting live to all viewers' : 'Not tracking — viewers see the full program'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setShowNightMode(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-ink-900 dark:bg-white text-white dark:text-ink-900 rounded-card font-bold text-sm transition-all active:scale-95 hover:bg-ink-700 dark:hover:bg-ink-100">
-                    <Tv2 size={14} /> <span className="hidden sm:inline">Show Night</span>
-                  </button>
-                  <button onClick={toggleTracking}
-                    className={clsx("flex items-center gap-2 px-4 py-2.5 rounded-card font-bold text-sm transition-all active:scale-95",
-                      currentAct?.isTracking ? "bg-red-500 text-white shadow-md shadow-red-500/20 hover:bg-red-600" : "bg-emerald-500 text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-600")}>
-                    {currentAct?.isTracking ? <><Square size={14} /> Stop</> : <><Play size={14} /> Go Live</>}
-                  </button>
-                </div>
-              </div>
-
-              {currentAct?.isTracking && (
-                <div className="p-4 sm:p-5">
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1 bg-gradient-to-r from-brand-600 to-brand-600 rounded-card p-4 text-white text-center relative overflow-hidden">
-                      <div className="absolute inset-0 bg-white/5" />
-                      <div className="relative z-10">
-                        <div className="text-[9px] uppercase tracking-widest font-semibold opacity-70 mb-1">Now Performing</div>
-                        <div className="text-4xl font-semibold tracking-tighter">#{currentAct.number}</div>
-                        <div className="text-sm font-bold opacity-90 mt-0.5 truncate">{currentAct.title}</div>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <button onClick={() => updateActNumber(currentAct.number + 1)}
-                        className="flex items-center justify-center gap-1.5 w-full px-4 py-3 bg-brand-600 text-white rounded-card font-bold text-xs shadow-md shadow-brand-500/20 hover:bg-brand-700 active:scale-95 transition-all">
-                        <SkipForward size={16} /> Next
-                      </button>
-                      <button onClick={() => updateActNumber(Math.max(1, currentAct.number - 1))} disabled={currentAct.number <= 1}
-                        className="flex items-center justify-center gap-1.5 w-full px-4 py-3 bg-ink-100 dark:bg-ink-700 text-ink-600 dark:text-ink-300 rounded-card font-bold text-xs hover:bg-ink-200 dark:hover:bg-ink-600 active:scale-95 transition-all disabled:opacity-30">
-                        <SkipBack size={16} /> Prev
-                      </button>
-                    </div>
-                  </div>
-                  {editData.acts.length > 0 && (
-                    <div className="mt-4">
-                      <p className="text-[10px] font-semibold uppercase text-ink-400 tracking-widest mb-2">Jump to Act</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {editData.acts.map(act => (
-                          <button key={act.number} onClick={() => updateActNumber(act.number)} title={act.title}
-                            className={clsx("w-9 h-9 rounded-lg font-bold text-xs transition-all active:scale-90",
-                              currentAct.number === act.number ? "bg-brand-600 text-white shadow-md shadow-brand-500/20" : "bg-ink-50 dark:bg-ink-900 text-ink-500 dark:text-ink-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 hover:text-brand-600")}>
-                            {act.number}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {editData.acts.length > 0 && (
-                    <div className="mt-4 flex items-center gap-3">
-                      <div className="flex-1 h-1.5 bg-ink-100 dark:bg-ink-900 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-brand-500 to-brand-500 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(Math.round((currentAct.number / editData.acts.length) * 100), 100)}%` }} />
-                      </div>
-                      <span className="text-[11px] font-bold text-ink-400 shrink-0">{currentAct.number} / {editData.acts.length}</span>
-                    </div>
-                  )}
-                </div>
-              )}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-card border border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-800">
+              <p className="text-sm text-ink-600 dark:text-ink-300">
+                {currentAct?.isTracking ? 'This show is live.' : 'Ready on show day?'} Moving between acts happens on the run screen.
+              </p>
+              <Link to={`/admin/run/${selectedShowId}`} className="h-11 px-5 rounded-card bg-ink-900 dark:bg-white text-white dark:text-ink-900 text-sm font-semibold flex items-center">
+                {currentAct?.isTracking ? 'Open the live show' : 'Run this show'}
+              </Link>
             </div>
           )}
 
           {/* Act Editor */}
           {editData && (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <BackToBackWarning acts={editData.acts} />
               <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-ink-800 p-4 rounded-card border border-ink-100 dark:border-ink-700 sticky top-0 z-20 shadow-sm">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="w-10 h-10 bg-brand-100 dark:bg-brand-900/30 text-brand-600 rounded-card flex items-center justify-center shrink-0"><Calendar size={18} /></div>
@@ -1041,9 +867,9 @@ export default function WorkspaceTab({
               </div>
 
               {showUploadPanel && (
-                <div className="bg-amber-50 dark:bg-amber-900/10 p-5 rounded-card border border-amber-200 dark:border-amber-800/30 animate-in fade-in duration-200">
+                <div className="bg-brand-50 dark:bg-brand-900/10 p-5 rounded-card border border-brand-200 dark:border-brand-800/30 animate-in fade-in duration-200">
                   <div className="flex items-start gap-3">
-                    <Database size={20} className="text-amber-600 shrink-0 mt-0.5" />
+                    <Database size={20} className="text-brand-600 shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <h4 className="font-semibold text-sm dark:text-white mb-1">Batch Upload from CSV</h4>
                       <div className="flex items-center justify-between mb-3">
@@ -1055,7 +881,7 @@ export default function WorkspaceTab({
                         </button>
                       </div>
                       <input type="file" accept=".csv" onChange={handleFileUpload}
-                        className="text-sm text-ink-500 file:mr-3 file:py-2 file:px-5 file:rounded-card file:border-0 file:bg-amber-500 file:text-white file:font-bold file:text-xs file:cursor-pointer" />
+                        className="text-sm text-ink-500 file:mr-3 file:py-2 file:px-5 file:rounded-card file:border-0 file:bg-brand-600 file:text-white file:font-bold file:text-xs file:cursor-pointer" />
                     </div>
                     <button onClick={() => setShowUploadPanel(false)} className="text-ink-400 hover:text-ink-600 p-1"><X size={16} /></button>
                   </div>
@@ -1086,6 +912,18 @@ export default function WorkspaceTab({
               )}
             </div>
           )}
+          </div>
+        </div>
+      )}
+
+      {/* Unsaved changes: always visible until saved or discarded */}
+      {isDirty && (
+        <div role="status" className="sticky bottom-20 md:bottom-4 z-30 flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-card bg-ink-900 text-white shadow-xl">
+          <span className="text-sm font-semibold">Unsaved changes to {editData?.label || 'this show'}</span>
+          <span className="flex gap-2">
+            <button onClick={onDiscard} className="h-10 px-4 rounded-card border border-white/30 text-sm hover:bg-white/10">Discard</button>
+            <button onClick={handleSave} className="h-10 px-4 rounded-card bg-white text-ink-900 text-sm font-semibold hover:bg-ink-100">Save changes</button>
+          </span>
         </div>
       )}
 
@@ -1128,6 +966,35 @@ function SortableActCard({ act, idx, updateAct, onRemove }) {
       <button onClick={onRemove} className="absolute right-3 top-3 p-2 text-ink-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
       </button>
+    </div>
+  );
+}
+
+// Dancers in consecutive acts have no time to change costume. Shown above the
+// act editor so it's caught before publishing.
+function BackToBackWarning({ acts }) {
+  const { canViewFullNames } = useApp();
+  const [open, setOpen] = useState(false);
+  const pairs = backToBackDancers(acts);
+  if (pairs.length === 0) return null;
+  const dancers = new Set(pairs.map(p => p.dancer)).size;
+  return (
+    <div role="note" className="p-4 rounded-card border border-stage-300 dark:border-stage-700 bg-stage-50 dark:bg-stage-900/20 text-sm text-ink-800 dark:text-stage-100">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p>
+          {dancers} dancer{dancers !== 1 ? 's are' : ' is'} in back-to-back acts with no time to change.
+        </p>
+        <button onClick={() => setOpen(o => !o)} aria-expanded={open} className="font-semibold underline">
+          {open ? 'Hide' : 'Show who'}
+        </button>
+      </div>
+      {open && (
+        <ul className="mt-2 space-y-0.5">
+          {pairs.map(p => (
+            <li key={`${p.dancer}-${p.from}`}>{displayName(p.dancer, canViewFullNames)}: acts {p.from} and {p.to}</li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

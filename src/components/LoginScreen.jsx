@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { ChevronDown, AlertCircle } from 'lucide-react';
 import BrandMark from './BrandMark';
+import AccessSteps from './ui/AccessSteps';
 import { auth, googleProvider } from '../firebase';
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getAuthErrorMessage } from '../utils/authErrors';
 
-export default function LoginScreen({ onSkip }) {
+// codeStep: { show, fromLink } — when the studio also needs a code, show the
+// two steps so families know what comes next.
+export default function LoginScreen({ onSkip, codeStep }) {
   const [showSignIn, setShowSignIn] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,9 +41,11 @@ export default function LoginScreen({ onSkip }) {
           <p className="text-ink-500 dark:text-ink-400 text-base px-4 leading-relaxed">
             {onSkip
               ? 'Browse the full recital program — no account needed.'
-              : 'Sign in to view the recital program.'}
+              : 'Sign in to see the running order.'}
           </p>
         </div>
+
+        {codeStep?.show && <AccessSteps step={1} codeFromLink={codeStep.fromLink} />}
 
         <div className="space-y-3">
           {/* Primary CTA — Guest (only when guest browsing is allowed) */}
@@ -134,7 +139,7 @@ export default function LoginScreen({ onSkip }) {
           </div>
 
           <p className="text-center text-[11px] text-ink-400 font-medium pt-1">
-            Sign in to save and sync favorites across devices
+            Your dancers and notes are saved to your account
           </p>
         </div>
       </div>

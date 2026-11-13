@@ -34,6 +34,7 @@ vi.mock('firebase/firestore', () => ({
   deleteDoc: vi.fn(),
   writeBatch: vi.fn(),
   updateDoc: vi.fn(),
+  arrayUnion: vi.fn((...items) => ({ type: 'arrayUnion', items })),
 }));
 
 // Mock react-router-dom for components that use hooks

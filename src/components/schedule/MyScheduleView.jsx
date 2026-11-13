@@ -1,6 +1,9 @@
 import React, { useMemo, useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Heart, Star, Music, ArrowRight, Clock, Pencil, Check, CloudUpload } from 'lucide-react';
+import { Heart, Star, Pencil, Check, CloudUpload } from 'lucide-react';
+import { getLiveStatus, whoLabel } from '../../utils/liveProgress';
+import { typicalActMs, minutesAway } from '../../utils/showControl';
+import AlertsToggle from '../ui/AlertsToggle';
 import { clsx } from 'clsx';
 import { Link } from 'react-router-dom';
 import { displayName } from '../../utils/names';
@@ -139,46 +142,48 @@ function SyncBanner() {
   );
 }
 
-export default function MyScheduleView({ showData, currentAct, showId }) {
-  const { favorites, toggleFavorite, dancerNotes, setDancerNote } = useApp();
+// The big sentence at the top of My night: when is my dancer on?
+function headline(status, nameFn, eta) {
+  const { phase, target, actsAway, headBackAfter, myActs } = status;
+  if (status.ended) return { title: 'That’s the show.', sub: 'Thanks for cheering them on.' };
+  if (phase === 'done') {
+    return { title: 'All of your acts are done.', sub: 'Thanks for cheering them on.' };
+  }
+  if (!target) return null;
+  const { who, plural } = whoLabel(target, nameFn);
+  const is = plural ? 'are' : 'is';
+  const actLine = `Act ${target.number}, ${target.title}.`;
+  switch (phase) {
+    case 'onstage': return { title: `${who} ${is} on stage.`, sub: actLine };
+    case 'next':    return { title: `${who} ${is} up next.`, sub: `Head to your seat now. ${actLine}` };
+    case 'soon':    return { title: `${who} ${is} on in 2 acts.`, sub: `${eta ? `That’s ${eta}. ` : ''}Head to your seat now. ${actLine}` };
+    case 'later':   return { title: `${who} ${is} on in ${actsAway} acts.`, sub: `${eta ? `That’s ${eta}. ` : ''}Head back after act ${headBackAfter.number}. ${actLine}` };
+    default: {
+      // Not tracking yet (before curtain or intermission).
+      const n = myActs.length;
+      return {
+        title: `${who} ${is} first on in act ${target.number}.`,
+        sub: `${n} of your act${n !== 1 ? 's are' : ' is'} in this show. The countdown starts when the show does.`,
+      };
+    }
+  }
+}
 
-  // Build a timeline of favorited acts in order
-  const schedule = useMemo(() => {
-    if (!showData?.acts || !favorites || favorites.size === 0) return [];
-    const actKey = (num) => showId ? `act-${showId}-${num}` : `act-${num}`;
+export default function MyScheduleView({ showData, currentAct, actLog, showId }) {
+  const { favorites, toggleFavorite, dancerNotes, setDancerNote, canViewFullNames } = useApp();
+  const nameFn = (n) => displayName(n, canViewFullNames);
 
-    return showData.acts
-      .filter(act =>
-        favorites.has(actKey(act.number)) ||
-        act.performers?.some(p => favorites.has(p))
-      )
-      .map(act => ({
-        ...act,
-        favoritedDancers: act.performers?.filter(p => favorites.has(p)) || [],
-        isActFav: favorites.has(actKey(act.number)),
-        actKey: actKey(act.number),
-      }));
-  }, [showData, favorites, showId]);
-
-  // Calculate stats
-  const stats = useMemo(() => {
-    if (!showData?.acts) return { total: 0, favorited: 0, dancers: 0 };
-    const dancerSet = new Set();
-    schedule.forEach(act => {
-      act.favoritedDancers.forEach(d => dancerSet.add(d));
-    });
-    return {
-      total: showData.acts.length,
-      favorited: schedule.length,
-      dancers: dancerSet.size,
-    };
-  }, [showData, schedule]);
+  const status = useMemo(
+    () => getLiveStatus(showData, currentAct, favorites, showId),
+    [showData, currentAct, favorites, showId]
+  );
+  const schedule = status.myActs;
 
   if (!showData) {
     return (
-      <div className="text-center py-20 bg-white dark:bg-ink-800 rounded-[2.5rem] border border-ink-100 dark:border-ink-700 shadow-sm">
-        <Heart size={48} className="mx-auto text-ink-200 dark:text-ink-700 mb-4" />
-        <p className="text-ink-400 font-bold">Select a performance to see your schedule.</p>
+      <div className="text-center py-16 px-6 bg-white dark:bg-ink-800 rounded-card border border-ink-100 dark:border-ink-700">
+        <p className="font-display text-xl dark:text-white mb-1">Choose your show</p>
+        <p className="text-sm text-ink-500 dark:text-ink-400">Pick the show on your ticket from the list above.</p>
       </div>
     );
   }
@@ -186,164 +191,150 @@ export default function MyScheduleView({ showData, currentAct, showId }) {
   if (schedule.length === 0) {
     return (
       <div className="space-y-4 animate-in fade-in">
-      <SyncBanner />
-      <div className="text-center py-16 bg-white dark:bg-ink-800 rounded-[2.5rem] border border-ink-100 dark:border-ink-700 shadow-sm space-y-4">
-        <div className="w-20 h-20 bg-brand-50 dark:bg-brand-900/20 rounded-full flex items-center justify-center mx-auto">
-          <Heart size={36} className="text-brand-300 dark:text-brand-700" />
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold dark:text-white mb-1">No favorites yet</h3>
-          <p className="text-ink-400 text-sm max-w-sm mx-auto">
-            Star your favorite acts or dancers from the program to build your personalized schedule.
+        <SyncBanner />
+        <section className="py-10 px-1 space-y-4">
+          <h2 className="font-display text-4xl sm:text-5xl font-medium leading-[1.05] tracking-tight dark:text-white">
+            Who are you here to see?
+          </h2>
+          <p className="text-ink-600 dark:text-ink-300 max-w-md">
+            Follow your dancer and this page tells you when they're on and when to head back to your seat.
           </p>
-        </div>
-        <div className="flex justify-center gap-3 pt-2">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 px-5 py-3 bg-brand-600 text-white rounded-card font-bold text-sm shadow-lg shadow-brand-500/20 hover:bg-brand-700 transition-colors"
-          >
-            Browse Program <ArrowRight size={16} />
-          </Link>
-          <Link
-            to="/search-dancers"
-            className="inline-flex items-center gap-2 px-5 py-3 bg-ink-100 dark:bg-ink-700 text-ink-700 dark:text-white rounded-card font-bold text-sm hover:bg-ink-200 dark:hover:bg-ink-600 transition-colors"
-          >
-            Find Dancers
-          </Link>
-        </div>
-      </div>
+          <div className="flex flex-wrap gap-3 pt-2">
+            <Link
+              to="/search?tab=dancers"
+              className="inline-flex items-center h-11 px-5 bg-brand-600 text-white rounded-card font-semibold text-sm hover:bg-brand-700 transition-colors"
+            >
+              Find your dancer
+            </Link>
+            <Link
+              to="/"
+              className="inline-flex items-center h-11 px-5 bg-ink-100 dark:bg-ink-700 text-ink-800 dark:text-white rounded-card font-semibold text-sm hover:bg-ink-200 dark:hover:bg-ink-600 transition-colors"
+            >
+              Browse the program
+            </Link>
+          </div>
+        </section>
       </div>
     );
   }
 
+  const head = headline(status, nameFn, minutesAway(status.actsAway, typicalActMs(actLog)));
+  const live = status.tracking && status.onStageIndex >= 0;
+  const nextIndex = status.target?.index;
+
   return (
-    <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+    <div className="space-y-6 sm:space-y-8 animate-in fade-in">
       <SyncBanner />
-      {/* Header */}
-      <div className="px-0.5">
-        <h2 className="text-xl sm:text-3xl font-semibold dark:text-white leading-tight">My Schedule</h2>
-        <p className="text-ink-400 text-[10px] font-semibold uppercase tracking-widest mt-0.5">
-          {showData.label}
-        </p>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <div className="bg-white dark:bg-ink-800 p-3 sm:p-4 rounded-card sm:rounded-card border border-ink-100 dark:border-ink-700 text-center shadow-sm">
-          <div className="text-xl sm:text-2xl font-semibold text-brand-600">{stats.favorited}</div>
-          <div className="text-[8px] sm:text-[9px] font-semibold text-ink-400 uppercase tracking-wider mt-0.5">Acts</div>
-        </div>
-        <div className="bg-white dark:bg-ink-800 p-3 sm:p-4 rounded-card sm:rounded-card border border-ink-100 dark:border-ink-700 text-center shadow-sm">
-          <div className="text-xl sm:text-2xl font-semibold text-brand-600">{stats.dancers}</div>
-          <div className="text-[8px] sm:text-[9px] font-semibold text-ink-400 uppercase tracking-wider mt-0.5">Dancers</div>
-        </div>
-        <div className="bg-white dark:bg-ink-800 p-3 sm:p-4 rounded-card sm:rounded-card border border-ink-100 dark:border-ink-700 text-center shadow-sm">
-          <div className="text-2xl font-semibold text-brand-600">
-            {stats.total > 0 ? Math.round((stats.favorited / stats.total) * 100) : 0}%
-          </div>
-          <div className="text-[9px] font-semibold text-ink-400 uppercase tracking-wider mt-1">Of Show</div>
-        </div>
-      </div>
+      {/* The one answer parents need */}
+      {head && (
+        <section className="pt-2 px-1 space-y-3" aria-live="polite">
+          <p className="text-sm text-ink-500 dark:text-ink-400">
+            {status.intermission ? 'Intermission' : live ? `Act ${status.onStage.number} is on stage` : showData.label}
+          </p>
+          <h2 className={clsx(
+            "font-display text-4xl sm:text-6xl font-medium leading-[1.04] tracking-tight",
+            status.phase === 'onstage' ? "text-brand-700 dark:text-brand-300"
+              : (status.phase === 'next' || status.phase === 'soon') ? "text-stage-700 dark:text-stage-300"
+              : "text-ink-900 dark:text-white"
+          )}>
+            {head.title}
+          </h2>
+          <p className="text-base text-ink-700 dark:text-ink-300 max-w-lg">{head.sub}</p>
+        </section>
+      )}
 
-      {/* Timeline */}
-      <div className="relative">
-        {/* Timeline line */}
-        <div className="absolute left-[14px] sm:left-6 top-0 bottom-0 w-0.5 bg-brand-100 dark:bg-brand-900/30" />
+      {/* Your acts, as checkpoints */}
+      <ol className="relative ml-2 pl-7 border-l-2 border-ink-200 dark:border-ink-700 space-y-5">
+        {schedule.map((act) => {
+          const isCurrent = live && !status.intermission && act.index === status.onStageIndex;
+          const isPast = (live && (act.index < status.onStageIndex || (status.intermission && act.index === status.onStageIndex))) || status.ended;
+          const isNext = live && act.index === nextIndex && !isCurrent;
+          const away = live && act.index > status.onStageIndex ? act.index - status.onStageIndex : null;
+          const emphasis = isCurrent || isNext;
 
-        <div className="space-y-4">
-          {schedule.map((act) => {
-            const isCurrent = currentAct?.isTracking && currentAct.number === act.number;
-            const isPast = currentAct?.isTracking && currentAct.number > act.number;
-            const isUpNext = currentAct?.isTracking && currentAct.number === act.number - 1;
+          const label = isCurrent ? `Act ${act.number}, on stage now`
+            : isPast ? `Act ${act.number}, done`
+            : isNext ? `Act ${act.number}, next for you, in ${away} act${away !== 1 ? 's' : ''}`
+            : away ? `Act ${act.number}, in ${away} acts`
+            : `Act ${act.number}`;
 
-            return (
-              <div key={act.number} className="relative pl-10 sm:pl-14">
-                {/* Timeline dot */}
-                <div className={clsx(
-                  "absolute left-[6px] sm:left-[18px] top-5 w-5 h-5 rounded-full border-[3px] z-10 transition-all",
-                  isCurrent
-                    ? "bg-brand-600 border-brand-300 scale-125 shadow-lg shadow-brand-500/40 animate-pulse"
+          return (
+            <li key={act.number} className="relative">
+              <span
+                aria-hidden="true"
+                className={clsx(
+                  "absolute rounded-full",
+                  emphasis
+                    ? "-left-[2.3rem] top-0.5 w-[1.1rem] h-[1.1rem] bg-brand-600 ring-4 ring-brand-100 dark:ring-brand-900/60"
                     : isPast
-                      ? "bg-brand-400 border-brand-200"
-                      : "bg-white dark:bg-ink-800 border-brand-300 dark:border-brand-700"
-                )} />
-
-                <div className={clsx(
-                  "p-5 rounded-card border transition-all",
-                  isCurrent
-                    ? "bg-brand-600 border-brand-500 text-white shadow-xl shadow-brand-500/20 scale-[1.02]"
-                    : isPast
-                      ? "bg-ink-50 dark:bg-ink-800/50 border-ink-100 dark:border-ink-700 opacity-60"
-                      : "bg-white dark:bg-ink-800 border-ink-100 dark:border-ink-700 shadow-sm"
-                )}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className={clsx(
-                        "w-10 h-10 rounded-card flex items-center justify-center font-semibold text-sm shrink-0",
-                        isCurrent
-                          ? "bg-white/20"
-                          : "bg-brand-50 dark:bg-brand-900/30 text-brand-600"
-                      )}>
-                        {act.number}
-                      </div>
-                      <div>
-                        <div className={clsx(
-                          "font-semibold text-base leading-tight",
-                          isCurrent ? "text-white" : "dark:text-white"
-                        )}>
-                          {act.title}
-                        </div>
-                        {isUpNext && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-semibold uppercase text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-md mt-1">
-                            <Clock size={10} /> Up Next
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => toggleFavorite(act.actKey)}
-                      className={clsx(
-                        "p-2 rounded-card transition-colors shrink-0",
-                        isCurrent ? "text-white/70 hover:text-white" : "text-brand-500"
-                      )}
-                    >
-                      <Star size={18} fill={act.isActFav ? "currentColor" : "none"} />
-                    </button>
-                  </div>
-
-                  {/* Favorited dancers — each with an editable private note */}
-                  {act.favoritedDancers.length > 0 && (
-                    <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
-                      {act.favoritedDancers.map(dancer => {
-                        const key = dancerNoteKey(showId, act, dancer);
-                        return (
-                          <DancerNote
-                            key={dancer}
-                            dancer={dancer}
-                            note={dancerNotes?.[key] || ''}
-                            isCurrent={isCurrent}
-                            onSave={(text) => setDancerNote(key, text)}
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Non-favorited performers */}
-                  {act.performers?.length > act.favoritedDancers.length && (
-                    <div className={clsx(
-                      "mt-2 text-xs leading-relaxed",
-                      isCurrent ? "text-white/60" : "text-ink-400"
-                    )}>
-                      +{act.performers.length - act.favoritedDancers.length} other performer{act.performers.length - act.favoritedDancers.length !== 1 ? 's' : ''}
-                    </div>
-                  )}
+                      ? "-left-[2.1rem] top-1 w-3.5 h-3.5 bg-ink-300 dark:bg-ink-600"
+                      : "-left-[2.1rem] top-1 w-3.5 h-3.5 bg-ink-50 dark:bg-ink-900 border-2 border-ink-300 dark:border-ink-600"
+                )}
+              />
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className={clsx(
+                    "text-xs font-semibold",
+                    emphasis ? "text-brand-700 dark:text-brand-300" : "text-ink-500 dark:text-ink-400"
+                  )}>
+                    {label}
+                  </p>
+                  <p className={clsx(
+                    "font-display italic leading-snug",
+                    emphasis ? "text-2xl" : "text-lg",
+                    isPast ? "text-ink-400 dark:text-ink-500 line-through" : "text-ink-900 dark:text-white"
+                  )}>
+                    {act.title}
+                  </p>
                 </div>
+                <button
+                  onClick={() => toggleFavorite(act.actKey)}
+                  aria-label={act.isActFav ? 'Saved. Tap to unsave this act' : 'Save this act'}
+                  aria-pressed={!!act.isActFav}
+                  className="w-11 h-11 -mt-1.5 rounded-card flex items-center justify-center text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors shrink-0"
+                >
+                  <Star size={18} fill={act.isActFav ? 'currentColor' : 'none'} />
+                </button>
               </div>
-            );
-          })}
+
+              {/* Followed dancers — each with an editable private note */}
+              {act.favoritedDancers.length > 0 && !isPast && (
+                <div className="mt-2 grid gap-1.5 sm:grid-cols-2 max-w-xl">
+                  {act.favoritedDancers.map(dancer => {
+                    const key = dancerNoteKey(showId, act, dancer);
+                    return (
+                      <DancerNote
+                        key={dancer}
+                        dancer={dancer}
+                        note={dancerNotes?.[key] || ''}
+                        isCurrent={false}
+                        onSave={(text) => setDancerNote(key, text)}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+
+      {!status.ended && <AlertsToggle variant="card" who={status.target ? whoLabel(status.target, nameFn).who.replace(/^Your act$/, 'your act') : 'your dancer'} />}
+
+      <div className="flex items-center justify-between gap-3 p-4 rounded-card border border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-800">
+        <div>
+          <p className="text-sm font-semibold dark:text-white">
+            {schedule.length} of your act{schedule.length !== 1 ? 's' : ''} in this show
+          </p>
+          <p className="text-xs text-ink-500 dark:text-ink-400">Add a sibling or a friend's dancer</p>
         </div>
+        <Link
+          to="/search?tab=dancers"
+          className="shrink-0 inline-flex items-center h-11 px-4 border border-ink-800 dark:border-ink-300 rounded-card text-sm font-semibold text-ink-900 dark:text-white hover:bg-ink-50 dark:hover:bg-ink-700 transition-colors"
+        >
+          Add dancer
+        </Link>
       </div>
     </div>
   );

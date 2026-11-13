@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { auth, db, authorizedUsers, coll } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, arrayUnion } from 'firebase/firestore';
@@ -60,6 +60,16 @@ export function AppProvider({ children }) {
 
   // Derived — no independent state; eliminates the dual-writer race
   const isAuthorized = useMemo(() => isSuperAdmin || isStudioAdmin, [isSuperAdmin, isStudioAdmin]);
+
+  // Show runners (org doc `showRunners: [{ email, shows: [showId] }]`) can only
+  // move acts. `runnerShows` is null when this account isn't a runner, [] when
+  // it may run every show, otherwise the show ids it was given.
+  const [runnerShows, setRunnerShows] = useState(null);
+  const isShowRunner = runnerShows !== null;
+  const canRunShow = useCallback(
+    (showId) => isAuthorized || (runnerShows !== null && (runnerShows.length === 0 || runnerShows.includes(showId))),
+    [isAuthorized, runnerShows]
+  );
 
   // Super-admin-managed allowlist of emails permitted to see full (non-redacted)
   // performer names. Watched live so grants/revokes take effect without reload.
@@ -150,6 +160,7 @@ export function AppProvider({ children }) {
           setUser(null);
           setIsSuperAdmin(false);
           setIsStudioAdmin(false);
+          setRunnerShows(null);
           setStudioAccess([]);
           // Fall back to whatever was saved while browsing as a guest.
           setFavorites(loadGuestFavorites());
@@ -291,6 +302,7 @@ export function AppProvider({ children }) {
       localStorage.removeItem('selectedOrgId');
       setOrgName('');
       setIsStudioAdmin(false);
+      setRunnerShows(null);
     }
   }, [orgId]);
 
@@ -346,6 +358,11 @@ export function AppProvider({ children }) {
         setOrgName(data.name || '');
         const studioAdmin = !!(user && data.admins?.includes(user.email));
         setIsStudioAdmin(studioAdmin);
+        const email = (user?.email || '').toLowerCase();
+        const runner = email && Array.isArray(data.showRunners)
+          ? data.showRunners.find(r => (r?.email || '').toLowerCase() === email)
+          : null;
+        setRunnerShows(runner ? (Array.isArray(runner.shows) ? runner.shows : []) : null);
 
         // Resolve the studio code (whether this account has cleared it is
         // derived from the profile's studioAccess list).
@@ -486,6 +503,7 @@ export function AppProvider({ children }) {
 
   const value = {
     user, isAuthorized, isSuperAdmin, isStudioAdmin, isAuthChecking,
+    isShowRunner, runnerShows, canRunShow,
     canViewFullNames, nameAccessEmails,
     hasSkippedLogin, skipLogin, clearSkipLogin,
     favorites, toggleFavorite,

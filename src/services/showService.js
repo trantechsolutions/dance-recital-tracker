@@ -264,6 +264,24 @@ export async function updateOrgAdmins(orgId, newAdmins) {
 }
 
 /**
+ * Show runners can only move acts during the shows they're given.
+ * Stored on the org doc as `showRunners: [{ email, shows: [showId] }]`
+ * (an empty `shows` list means every show). Emails are stored lower-case.
+ */
+export async function updateOrgShowRunners(orgId, runners) {
+  const showRunners = (runners || []).map(r => ({
+    email: (r.email || '').trim().toLowerCase(),
+    shows: Array.isArray(r.shows) ? r.shows : [],
+  })).filter(r => r.email);
+  // runnerShows mirrors the list as { email: [showId] } so Firestore rules can
+  // check a runner without looping (rules can't search a list of maps).
+  const runnerShows = Object.fromEntries(showRunners.map(r => [r.email, r.shows]));
+  // mergeFields replaces both fields whole (a plain merge would keep removed
+  // runners' keys inside the map) while leaving the rest of the doc alone.
+  await setDoc(doc(db, coll('organizations'), orgId), { showRunners, runnerShows }, { mergeFields: ['showRunners', 'runnerShows'] });
+}
+
+/**
  * Rename a studio's display name. The document id is intentionally never
  * changed — it's referenced by shows.org_id, share links, and localStorage.
  * The slug field is (re)written alongside as a backfill for org docs created

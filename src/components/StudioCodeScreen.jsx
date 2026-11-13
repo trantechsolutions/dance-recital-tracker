@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import AccessSteps from './ui/AccessSteps';
 import { KeyRound, AlertCircle } from 'lucide-react';
 
 const LEN = 8; // two groups of four, joined by a hyphen on submit
@@ -7,8 +8,13 @@ const sanitize = (s) => (s || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
 // Shareable-passcode gate shown after the login screen. Entered as 8 segmented
 // boxes (xxxx-xxxx) with full paste support. The code gates a studio; on a
 // correct entry the account is remembered so it isn't re-prompted.
-export default function StudioCodeScreen({ orgName, onSubmit, onSignOut }) {
-  const [chars, setChars] = useState(Array(LEN).fill(''));
+// linkCode: a code carried in by the family link — filled in and tried
+// automatically; onLinkCodeUsed clears it so a wrong code isn't retried.
+export default function StudioCodeScreen({ orgName, onSubmit, onSignOut, linkCode, onLinkCodeUsed }) {
+  const [chars, setChars] = useState(() => {
+    const pre = sanitize(linkCode).slice(0, LEN);
+    return Array.from({ length: LEN }, (_, i) => pre[i] || '');
+  });
   const [error, setError] = useState('');
   const inputs = useRef([]);
 
@@ -45,6 +51,19 @@ export default function StudioCodeScreen({ orgName, onSubmit, onSignOut }) {
   };
 
   const filled = chars.every(Boolean);
+
+  // Try the link's code once; if it's wrong, ask for it to be typed.
+  useEffect(() => {
+    if (!linkCode) return;
+    const t = setTimeout(() => {
+      onLinkCodeUsed?.();
+      const pre = sanitize(linkCode);
+      if (pre.length === LEN && onSubmit(`${pre.slice(0, 4)}-${pre.slice(4)}`)) return;
+      setError('The code in your link didn’t work. Type the code from your studio.');
+      setChars(Array(LEN).fill(''));
+    }, 0);
+    return () => clearTimeout(t);
+  }, [linkCode, onLinkCodeUsed, onSubmit]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -91,6 +110,8 @@ export default function StudioCodeScreen({ orgName, onSubmit, onSignOut }) {
             Enter the studio code to continue.
           </p>
         </div>
+
+        <AccessSteps step={2} codeFromLink={!!linkCode} />
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
