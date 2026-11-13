@@ -16,7 +16,7 @@ export default function SyncPromptModal({ isOpen, counts, manual = false, onSync
   const fav = counts?.favorites || 0;
   const notes = counts?.notes || 0;
   const parts = [];
-  if (fav) parts.push(`${fav} favorite${fav === 1 ? '' : 's'}`);
+  if (fav) parts.push(`${fav} ${fav === 1 ? 'dancer or act' : 'dancers and acts'} you follow`);
   if (notes) parts.push(`${notes} note${notes === 1 ? '' : 's'}`);
   const summary = parts.join(' and ');
 

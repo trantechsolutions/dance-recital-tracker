@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useApp } from './context/AppContext';
 import { useLiveTracker } from './hooks/useLiveTracker';
@@ -20,16 +20,26 @@ import SearchView from './components/search/SearchView';
 import MyScheduleView from './components/schedule/MyScheduleView';
 import SettingsView from './components/SettingsView';
 import AdminDashboard from './components/admin/AdminDashboard';
-import StickyHeader from './components/ui/StickyHeader';
+import AdminHome from './components/admin/AdminHome';
+import RunShow from './components/admin/RunShow';
+import AccessView from './components/admin/AccessView';
 import NavButton from './components/ui/NavButton';
 import SidebarLink from './components/ui/SidebarLink';
-import LiveTrackerHero from './components/program/LiveTrackerHero';
 import StudioSelector from './components/StudioSelector';
 import ShowSelector from './components/ui/ShowSelector';
 import FloatingButtons from './components/ui/FloatingButtons';
+import LiveBar from './components/ui/LiveBar';
+import DimPrompt from './components/ui/DimPrompt';
+import RunnerWelcome from './components/ui/RunnerWelcome';
+import { applyTheme, THEME_EVENT } from './utils/theme';
+import { getLiveStatus } from './utils/liveProgress';
+import { typicalActMs, minutesAway } from './utils/showControl';
+import { displayName as dancerName } from './utils/names';
+import { useActAlerts } from './hooks/useActAlerts';
 import LoginPromptModal from './components/ui/LoginPromptModal';
 import SyncPromptModal from './components/ui/SyncPromptModal';
 import TutorialOverlay from './components/ui/TutorialOverlay';
+import Welcome from './components/onboarding/Welcome';
 
 // Helper component
 function LoadingScreen({ text }) {
@@ -51,6 +61,7 @@ export default function App() {
   // 1. Hook into Context
   const {
     user, isAuthorized, isSuperAdmin, isAuthChecking,
+    isShowRunner, canRunShow, canViewFullNames,
     favorites, toggleFavorite,
     orgId, setOrgId, orgName, orgResolveAttempted,
     studioCode, studioUnlocked, submitStudioCode, studioCodeReady,
@@ -59,15 +70,47 @@ export default function App() {
   } = useApp();
 
   // 2. Initialize show locally from URL (for deep links)
-  const [selectedShow, setSelectedShow] = useState(() => searchParams.get('show') || '');
+  // The show: a deep link wins, then the last show picked on this device.
+  const [selectedShow, setSelectedShow] = useState(() => {
+    const fromUrl = searchParams.get('show');
+    if (fromUrl) return fromUrl;
+    try { return localStorage.getItem('lastShow') || ''; } catch { return ''; }
+  });
+  useEffect(() => {
+    try {
+      if (selectedShow) localStorage.setItem('lastShow', selectedShow);
+      else if (recitalData) localStorage.removeItem('lastShow');
+    } catch { /* private mode */ }
+  }, [selectedShow, recitalData]);
+
+  // Family link (?code=…): keep the studio code for this visit (it survives the
+  // sign-in step and a reload), drop it from the address bar, and let the code
+  // screen submit it on the family's behalf.
+  const [linkCode, setLinkCode] = useState(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get('code') || '';
+    try {
+      if (fromUrl) sessionStorage.setItem('pendingStudioCode', fromUrl);
+      return fromUrl || sessionStorage.getItem('pendingStudioCode') || '';
+    } catch { return fromUrl; }
+  });
+  const clearLinkCode = useCallback(() => {
+    try { sessionStorage.removeItem('pendingStudioCode'); } catch { /* private mode */ }
+    setLinkCode('');
+  }, []);
+  useEffect(() => {
+    if (!searchParams.has('code')) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('code');
+    navigate({ pathname: location.pathname, search: next.toString() }, { replace: true });
+  }, [searchParams, navigate, location.pathname]);
 
   // 3. Track Live Data — hold the Firestore subscription until auth is ready.
   // When LOGIN_REQUIRED, shows/acts reads need an authenticated token; firing
   // the listener before sign-in gets a permission-denied it never recovers from.
   const dataAccessReady = !LOGIN_REQUIRED || !!user;
   const {
-    recitalData, currentAct, loading, liveShowId,
-    setRecitalData, invalidateActsCache, updateActNumber, toggleTracking
+    recitalData, currentAct, actLog, loading, liveShowId,
+    setRecitalData, invalidateActsCache, updateActNumber, setShowPhase, toggleTracking
   } = useLiveTracker(orgId, selectedShow, dataAccessReady);
 
   // 4. Handle deep-linked Organization (only on initial load).
@@ -82,21 +125,44 @@ export default function App() {
     }
   }, [searchParams, orgId, setOrgId]);
 
-  // 5. Auto-select show: prefer live show, then only show if exactly one exists
+  // 5. Auto-select show when none is chosen (or the remembered one is gone):
+  //    the live show, else the one show your followed dancers are in, else the
+  //    only show.
   useEffect(() => {
-    if (!recitalData || selectedShow) return;
+    if (!recitalData) return;
+    if (selectedShow && recitalData[selectedShow]) return;
     const showIds = Object.keys(recitalData);
     if (showIds.length === 0) return;
-    const toSelect = (liveShowId && recitalData[liveShowId])
-      ? liveShowId
-      : showIds.length === 1 ? showIds[0] : null;
+    const followed = [...(favorites || [])].filter(f => !f.startsWith('act-'));
+    const withMyDancers = followed.length
+      ? showIds.filter(id => recitalData[id].acts?.some(a => a.performers?.some(p => followed.includes(p))))
+      : [];
+    const toSelect = (liveShowId && recitalData[liveShowId]) ? liveShowId
+      : withMyDancers.length === 1 ? withMyDancers[0]
+      : showIds.length === 1 ? showIds[0]
+      : (selectedShow ? '' : null);
     // setTimeout defers the state update to avoid cascading renders within effect
-    if (toSelect) {
+    if (toSelect !== null) {
       let cancelled = false;
       const t = setTimeout(() => { if (!cancelled) setSelectedShow(toSelect); }, 0);
       return () => { cancelled = true; clearTimeout(t); };
     }
-  }, [recitalData, liveShowId, selectedShow]);
+  }, [recitalData, liveShowId, selectedShow, favorites]);
+
+  // First visit: a two-step welcome (show, then dancer) instead of the tour.
+  // Only for people who have never seen either.
+  const [welcomeOpen, setWelcomeOpen] = useState(() => {
+    try { return !localStorage.getItem('welcomeDone_v1') && !localStorage.getItem('tutorialSeen_v1'); }
+    catch { return false; }
+  });
+  const finishWelcome = (dest) => {
+    try {
+      localStorage.setItem('welcomeDone_v1', new Date().toISOString());
+      localStorage.setItem('tutorialSeen_v1', new Date().toISOString());
+    } catch { /* private mode */ }
+    setWelcomeOpen(false);
+    navigate(dest === 'my-night' ? '/my-night' : '/');
+  };
 
   const handleSwitchStudio = () => {
     setOrgId(null);
@@ -104,25 +170,41 @@ export default function App() {
     navigate('/', { replace: true });
   };
 
-  // Theme Restoration
+  // Theme: the saved choice, OS changes, and (optionally) dark while a show is live
+  const showIsLive = !!currentAct?.isTracking;
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') || 'system';
-    const applyTheme = (t) => {
-      const isDark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-      document.documentElement.classList.toggle('dark', isDark);
-    };
-    applyTheme(savedTheme);
-
+    const apply = () => applyTheme({ live: showIsLive });
+    apply();
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = () => {
-      if (localStorage.getItem('theme') === 'system' || !localStorage.getItem('theme')) applyTheme('system');
+    mediaQuery.addEventListener('change', apply);
+    window.addEventListener(THEME_EVENT, apply);
+    return () => {
+      mediaQuery.removeEventListener('change', apply);
+      window.removeEventListener(THEME_EVENT, apply);
     };
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
+  }, [showIsLive]);
 
-  // Favorites count
-  const favCount = favorites?.size || 0;
+  // Where the selected show is, from this viewer's point of view.
+  const liveStatus = useMemo(
+    () => getLiveStatus(selectedShow ? recitalData?.[selectedShow] : null, currentAct, favorites, selectedShow),
+    [recitalData, selectedShow, currentAct, favorites]
+  );
+
+  // My night badge: how many of your acts are still to come in this show.
+  const favCount = useMemo(() => {
+    if (liveStatus.ended) return 0;
+    const doneBefore = liveStatus.tracking ? (liveStatus.intermission ? liveStatus.onStageIndex + 1 : liveStatus.onStageIndex) : 0;
+    return liveStatus.myActs.filter(a => a.index >= doneBefore).length;
+  }, [liveStatus]);
+
+  // Phone alerts at 3 acts away and up next (if the viewer turned them on).
+  useActAlerts({
+    status: liveStatus,
+    showId: selectedShow,
+    showLabel: recitalData?.[selectedShow]?.label,
+    nameFn: (n) => dancerName(n, canViewFullNames),
+    eta: minutesAway(liveStatus.actsAway, typicalActMs(actLog)),
+  });
 
   // Display name: real org name from Firestore, fallback to slug
   const displayName = orgName || (orgId ? orgId.replace(/-/g, ' ') : 'Global Admin');
@@ -137,7 +219,7 @@ export default function App() {
   // accounts that already unlocked this studio (studioUnlocked) skip the code.
   if (LOGIN_REQUIRED) {
     // 1) Hard login gate — onSkip omitted hides the "Browse Program" button.
-    if (!user) return <LoginScreen />;
+    if (!user) return <LoginScreen codeStep={{ show: !!studioCode || !!linkCode, fromLink: !!linkCode }} />;
 
     // Wait until we know whether this org requires a code (org doc fetched),
     // so the code screen doesn't flash before the requirement resolves.
@@ -145,7 +227,7 @@ export default function App() {
 
     // 2) Studio code: a shareable passcode that gates the studio's content.
     if (studioCode && !studioUnlocked) {
-      return <StudioCodeScreen orgName={orgName} onSubmit={submitStudioCode} onSignOut={() => signOut(auth)} />;
+      return <StudioCodeScreen orgName={orgName} onSubmit={submitStudioCode} onSignOut={() => signOut(auth)} linkCode={linkCode} onLinkCodeUsed={clearLinkCode} />;
     }
   }
 
@@ -192,12 +274,15 @@ export default function App() {
   if (loading && !isAdminRoute) return <LoadingScreen text="Syncing Cloud" />;
 
   const isHideSelector = isAdminRoute || location.pathname.startsWith('/settings');
+  // Admin has its own live controller; everywhere else the docked bar is the
+  // single "now performing" signal.
+  const showLiveBar = !!currentAct?.isTracking && !!selectedShow && !isAdminRoute;
 
   const commonProps = {
     showData: selectedShow ? recitalData?.[selectedShow] : null,
     selectedShow,
     showId: selectedShow,
-    currentAct, isAuthorized, favorites, toggleFavorite, user,
+    currentAct, actLog, isAuthorized, favorites, toggleFavorite, user,
     onUpdate: updateActNumber, onToggle: toggleTracking
   };
 
@@ -224,13 +309,13 @@ export default function App() {
 
         <div className="space-y-1 flex-1">
           <SidebarLink to="/" active={location.pathname === '/'} icon={<List size={18}/>} label="Program" />
-          <SidebarLink to="/search" active={location.pathname === '/search'} icon={<Search size={18}/>} label="Search" />
-          <SidebarLink to="/my-schedule" active={location.pathname === '/my-schedule'} icon={<Heart size={18}/>} label="My Schedule" badge={favCount} />
+          <SidebarLink to="/search" active={location.pathname === '/search'} icon={<Search size={18}/>} label="Find" />
+          <SidebarLink to="/my-night" active={location.pathname === '/my-night'} icon={<Heart size={18}/>} label="My night" badge={favCount} />
         </div>
 
         <div className="pt-4 space-y-1 border-t border-ink-100 dark:border-ink-800">
-          {isAuthorized && (
-            <SidebarLink to="/admin" active={location.pathname === '/admin'} icon={<ShieldAlert size={18}/>} label="Admin Console" />
+          {(isAuthorized || isShowRunner) && (
+            <SidebarLink to="/admin" active={location.pathname.startsWith('/admin')} icon={<ShieldAlert size={18}/>} label={isAuthorized ? 'Admin' : 'Run a show'} />
           )}
           <SidebarLink to="/settings" active={location.pathname === '/settings'} icon={<Settings size={18}/>} label="Settings" />
 
@@ -254,7 +339,7 @@ export default function App() {
               </div>
               <div className="overflow-hidden flex-1 min-w-0">
                 <p className="text-sm font-semibold dark:text-white">Sign In</p>
-                <p className="text-[11px] font-medium text-ink-500 dark:text-ink-400 mt-0.5">Sync your favorites</p>
+                <p className="text-[11px] font-medium text-ink-500 dark:text-ink-400 mt-0.5">Keep your dancers on every phone</p>
               </div>
             </Link>
           )}
@@ -262,9 +347,7 @@ export default function App() {
       </nav>
 
       {/* --- MAIN CONTENT AREA --- */}
-      <div className="flex-1 md:ml-64 min-h-screen pb-24 md:pb-12">
-        <StickyHeader currentAct={currentAct} isAuthorized={isAuthorized} onUpdate={updateActNumber} />
-
+      <div className={`flex-1 md:ml-64 min-h-screen ${showLiveBar ? 'pb-44 md:pb-32' : 'pb-24 md:pb-12'}`}>
         <div className="max-w-4xl mx-auto px-4 sm:px-5 md:px-10 pt-5 sm:pt-6 md:pt-8">
           {/* Mobile header */}
           <header className="md:hidden flex items-center justify-between mb-5">
@@ -313,26 +396,43 @@ export default function App() {
              />
           )}
 
-          <main className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-            {selectedShow && !isHideSelector && (
-              <LiveTrackerHero
-                currentAct={currentAct}
-                favorites={favorites}
-                showData={commonProps.showData}
-                showId={selectedShow}
-              />
-            )}
+          {!isHideSelector && <RunnerWelcome recitalData={recitalData} />}
 
+          {/* A different show just went live: one tap to follow it */}
+          {!isHideSelector && liveShowId && liveShowId !== selectedShow && recitalData?.[liveShowId] && (
+            <button
+              onClick={() => setSelectedShow(liveShowId)}
+              className="w-full mb-5 flex items-center justify-between gap-3 px-4 min-h-[52px] rounded-card bg-stage-50 dark:bg-stage-900/25 border border-stage-300 dark:border-stage-700 text-left text-sm text-ink-900 dark:text-stage-50"
+            >
+              <span><span className="font-semibold">{recitalData[liveShowId].label}</span> is live now.</span>
+              <span className="font-semibold underline shrink-0">Switch to it</span>
+            </button>
+          )}
+
+          <main className="animate-in fade-in slide-in-from-bottom-2 duration-500">
             <Routes>
               <Route path="/" element={<ProgramView {...commonProps} />} />
-              <Route path="/search" element={<SearchView {...commonProps} />} />
+              <Route path="/search" element={<SearchView {...commonProps} recitalData={recitalData} />} />
               {/* Legacy deep-link redirects */}
               <Route path="/search-acts" element={<Navigate to="/search?tab=acts" replace />} />
               <Route path="/search-dancers" element={<Navigate to="/search?tab=dancers" replace />} />
-              <Route path="/my-schedule" element={<MyScheduleView {...commonProps} />} />
+              <Route path="/my-night" element={<MyScheduleView {...commonProps} />} />
+              <Route path="/my-schedule" element={<Navigate to="/my-night" replace />} />
               <Route
                 path="/admin"
-                element={isAuthorized ? <AdminDashboard recitalData={recitalData} setRecitalData={setRecitalData} invalidateActsCache={invalidateActsCache} currentAct={currentAct} updateActNumber={updateActNumber} toggleTracking={toggleTracking} selectedShow={selectedShow} setSelectedShow={setSelectedShow} /> : <Navigate to="/" />}
+                element={<AdminHome recitalData={recitalData} liveShowId={liveShowId} />}
+              />
+              <Route
+                path="/admin/run/:showId"
+                element={<RunShow recitalData={recitalData} currentAct={currentAct} actLog={actLog} updateActNumber={updateActNumber} setShowPhase={setShowPhase} selectedShow={selectedShow} setSelectedShow={setSelectedShow} />}
+              />
+              <Route
+                path="/admin/setup"
+                element={isAuthorized ? <AdminDashboard recitalData={recitalData} setRecitalData={setRecitalData} invalidateActsCache={invalidateActsCache} currentAct={currentAct} updateActNumber={updateActNumber} toggleTracking={toggleTracking} selectedShow={selectedShow} setSelectedShow={setSelectedShow} /> : <Navigate to="/admin" />}
+              />
+              <Route
+                path="/admin/access"
+                element={<AccessView recitalData={recitalData} />}
               />
               <Route path="/settings" element={<SettingsView />} />
               <Route path="*" element={<Navigate to="/" />} />
@@ -341,8 +441,23 @@ export default function App() {
         </div>
       </div>
 
+      {/* --- THE ONE LIVE SIGNAL: docked above the nav while a show runs --- */}
+      {showLiveBar && (
+        <LiveBar
+          showData={commonProps.showData}
+          showId={selectedShow}
+          currentAct={currentAct}
+          actLog={actLog}
+          favorites={favorites}
+          isAuthorized={canRunShow(selectedShow)}
+          onUpdate={updateActNumber}
+        />
+      )}
+
+      <DimPrompt live={showLiveBar} />
+
       {/* --- FLOATING ACTION BUTTONS --- */}
-      <FloatingButtons currentAct={currentAct} />
+      <FloatingButtons liftAboveLiveBar={showLiveBar} />
 
       {/* --- MOBILE BOTTOM NAV --- */}
       <nav
@@ -350,9 +465,9 @@ export default function App() {
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         <NavButton to="/" active={location.pathname === '/'} icon={<List size={20}/>} label="Program" />
-        <NavButton to="/search" active={location.pathname === '/search'} icon={<Search size={20}/>} label="Search" />
-        <NavButton to="/my-schedule" active={location.pathname === '/my-schedule'} icon={<Heart size={20}/>} label="Schedule" badge={favCount} />
-        <NavButton to="/settings" active={location.pathname === '/settings' || location.pathname === '/admin'} icon={<Settings size={20}/>} label="Settings" />
+        <NavButton to="/search" active={location.pathname === '/search'} icon={<Search size={20}/>} label="Find" />
+        <NavButton to="/my-night" active={location.pathname === '/my-night'} icon={<Heart size={20}/>} label="My night" badge={favCount} />
+        <NavButton to="/settings" active={location.pathname === '/settings' || location.pathname.startsWith('/admin')} icon={<Settings size={20}/>} label="Settings" />
       </nav>
 
       {/* --- LOGIN PROMPT MODAL --- */}
@@ -373,6 +488,16 @@ export default function App() {
 
       {/* --- FIRST-RUN "HOW TO USE" TUTORIAL --- */}
       <TutorialOverlay />
+
+      {/* --- FIRST VISIT --- */}
+      {welcomeOpen && !isAdminRoute && recitalData && Object.keys(recitalData).length > 0 && (
+        <Welcome
+          recitalData={recitalData}
+          selectedShow={selectedShow}
+          setSelectedShow={setSelectedShow}
+          onDone={finishWelcome}
+        />
+      )}
     </div>
   );
 }

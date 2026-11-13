@@ -21,7 +21,7 @@ function buildGeneralSteps() {
       blurb: "Here's a 30-second tour of the recital app and what each menu does.",
       points: [
         'Browse the full program and follow the show live',
-        'Star your favorite acts and dancers',
+        'Tap the star to save an act; follow a dancer from Find',
         'Build a personal schedule with private notes',
       ],
     },
@@ -42,24 +42,23 @@ function buildGeneralSteps() {
       key: 'search',
       icon: Search,
       tint: 'sky',
-      title: 'Search',
-      blurb: 'Find any act or dancer in seconds.',
+      title: 'Find',
+      blurb: 'One search box for dancers and acts.',
       points: [
-        'Search acts by title, number, or performer',
-        'Switch to the Dancers tab to look someone up by name',
-        'See every act a dancer appears in',
-        'Favorite results without leaving the search',
+        'Type a dancer’s first name, or an act’s title or number',
+        'Dancers show every act they’re in, across all shows',
+        'Tap Follow and their acts are marked in the program',
       ],
     },
     {
       key: 'schedule',
       icon: Heart,
       tint: 'rose',
-      title: 'My Schedule',
-      blurb: 'Your personalized lineup of everything you starred.',
+      title: 'My night',
+      blurb: 'When your dancer is on, and when to head back to your seat.',
       points: [
-        'A timeline of just the acts and dancers you favorited',
-        'Shows what’s on now and what’s up next during a live show',
+        'Just the acts and dancers you follow, in running order',
+        'During the show it counts down: “Ava is on in 5 acts. Head back after act 15.”',
         'Add a private note to each dancer per dance — outfit, hairstyle, props',
         'Only you can see your notes (sign in to sync them across devices)',
       ],
@@ -71,7 +70,7 @@ function buildGeneralSteps() {
       title: 'Settings',
       blurb: 'Your account and preferences.',
       points: [
-        'Sign in to sync your favorites and notes across devices',
+        'Signed in, your dancers and notes are on every phone',
         'Switch between Light, Dark, and System themes',
         ...(MULTI_STUDIO_ENABLED ? ['Switch to a different studio'] : []),
         'Replay this tour anytime and view the app history',
@@ -82,7 +81,7 @@ function buildGeneralSteps() {
       icon: PartyPopper,
       tint: 'brand',
       title: "You're all set!",
-      blurb: 'Star your favorites to start building your schedule.',
+      blurb: 'Follow your dancer and My night tells you when to head back.',
       points: [
         'You can reopen this tour anytime from Settings',
         'Enjoy the show! 🩰',
@@ -99,39 +98,49 @@ function buildAdminSteps({ isSuperAdmin }) {
       key: 'admin-welcome',
       icon: ShieldAlert,
       tint: 'amber',
-      title: 'Admin Console',
-      blurb: "Here's how to set up and run your recital from here.",
+      title: 'Admin',
+      blurb: 'Show day comes first; setup sits underneath.',
       points: [
-        'Build your program: shows, acts, and performers',
-        'Run the show live so every viewer follows along',
-        'Click the ? in the admin panel anytime to reopen this guide',
-      ],
-    },
-    {
-      key: 'workspace',
-      icon: Calendar,
-      tint: 'brand',
-      title: 'Shows & Acts',
-      blurb: 'Build and manage your program.',
-      points: [
-        'Create a show with its date, time, and title',
-        'Add, rename, and drag-to-reorder acts',
-        'Add performers to each act (with optional notes)',
-        'Import a whole lineup at once from a CSV file',
-        'Hit Save — viewers see your changes live',
+        'Admin opens on your shows, each with a Run this show button',
+        'Setup holds shows, the running order, and access',
+        'Tap the ? on the admin page anytime to reopen this guide',
       ],
     },
     {
       key: 'live',
       icon: Radio,
       tint: 'rose',
-      title: 'Run the Live Show',
-      blurb: 'Drive the program in real time on show night.',
+      title: 'Run the show',
+      blurb: 'One big Next button, built for a phone in the dark.',
       points: [
-        'Open the live controller for the selected show',
-        'Advance the current act (arrow keys, or Space for next)',
-        'Every viewer’s program and “Now Playing” updates automatically',
-        'Start or stop tracking whenever you like',
+        'Start the show, then press Next as each dance begins',
+        'Every move shows an Undo for 8 seconds',
+        'A presentation clicker or the keyboard works too (Page Down, Space, arrows)',
+        'Optional listening assist offers the next act when new music starts',
+      ],
+    },
+    {
+      key: 'workspace',
+      icon: Calendar,
+      tint: 'brand',
+      title: 'Shows and running order',
+      blurb: 'Build the program before show day.',
+      points: [
+        'Create a show, then add and drag-to-reorder acts',
+        'Import a whole lineup from a spreadsheet (CSV)',
+        'A warning flags dancers in back-to-back acts',
+        'Save, and families see the changes right away',
+      ],
+    },
+    {
+      key: 'access',
+      icon: Users,
+      tint: 'sky',
+      title: 'Access and show runners',
+      blurb: 'Who can get in, and who can help.',
+      points: [
+        'Set the studio code and copy the family link',
+        'Add admins, or show runners who can only move acts',
       ],
     },
   ];
@@ -188,8 +197,8 @@ const TINT = {
 
 export default function TutorialOverlay() {
   const {
-    showTutorial, tutorialVariant, openTutorial, dismissTutorial,
-    tutorialNeverSeen, isSuperAdmin,
+    showTutorial, tutorialVariant, dismissTutorial,
+    isSuperAdmin,
   } = useApp();
   const [index, setIndex] = useState(0);
 
@@ -198,12 +207,8 @@ export default function TutorialOverlay() {
     [tutorialVariant, isSuperAdmin]
   );
 
-  // First-run auto-open of the user-facing tour. Mounted only inside the main
-  // app shell, so by the time this runs the menus it describes are on screen.
-  useEffect(() => {
-    if (tutorialNeverSeen()) openTutorial('general');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // The tour no longer opens on its own: first visits get the Welcome flow
+  // (show, then dancer). The tour is still available from Settings.
 
   // Always restart at the first step whenever the tour is (re)opened or the
   // variant changes.

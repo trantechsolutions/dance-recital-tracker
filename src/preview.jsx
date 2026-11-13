@@ -2,9 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import './index.css';
-import LiveTrackerHero from './components/program/LiveTrackerHero';
 import ActCard from './components/program/ActCard';
-import StickyHeader from './components/ui/StickyHeader';
+import LiveBar from './components/ui/LiveBar';
+import { AppProvider } from './context/AppContext';
 
 const MOCK_ACTS = [
   { number: 1, title: 'Opening Overture', performers: ['Emma R.', 'Sofia L.', 'Mia K.', 'Lily P.', 'Ava C.', 'Chloe B.'] },
@@ -24,21 +24,21 @@ function Preview() {
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-ink-50 dark:bg-ink-900 text-ink-900 dark:text-ink-100 transition-colors">
-        <StickyHeader currentAct={CURRENT} isAuthorized={true} onUpdate={() => {}} />
-        <div className="max-w-2xl mx-auto px-5 pt-20 pb-12">
+        <LiveBar
+          showData={{ acts: MOCK_ACTS }}
+          showId={SHOW_ID}
+          currentAct={CURRENT}
+          favorites={FAVORITES}
+          isAuthorized={false}
+          onUpdate={() => {}}
+        />
+        <div className="max-w-2xl mx-auto px-5 pt-8 pb-40">
           <header className="mb-6">
             <h1 className="font-display text-3xl font-medium text-brand-700 dark:text-brand-400 tracking-tight leading-tight capitalize">
               Dancer's Pointe Studio
             </h1>
             <p className="text-ink-400 text-[11px] font-medium uppercase tracking-marquee mt-1.5">Recital Program</p>
           </header>
-
-          <LiveTrackerHero
-            currentAct={CURRENT}
-            favorites={FAVORITES}
-            showData={{ acts: MOCK_ACTS }}
-            showId={SHOW_ID}
-          />
 
           <div className="flex items-baseline justify-between mb-4 px-0.5">
             <h2 className="font-display text-2xl font-medium italic text-ink-900 dark:text-white">
@@ -73,4 +73,8 @@ if (params.get('theme') === 'dark') {
   document.documentElement.classList.add('dark');
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<Preview />);
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <AppProvider>
+    <Preview />
+  </AppProvider>
+);

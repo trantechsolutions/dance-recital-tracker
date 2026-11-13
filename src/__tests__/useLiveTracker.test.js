@@ -19,8 +19,10 @@ describe('useLiveTracker', () => {
     vi.clearAllMocks();
     unsubMock = vi.fn();
 
+    onSnapshotCallback = undefined;
+    // Two query listeners now (shows, then the live show); tests drive the first.
     onSnapshot.mockImplementation((query, callback) => {
-      onSnapshotCallback = callback;
+      if (!onSnapshotCallback) onSnapshotCallback = callback;
       return unsubMock;
     });
 
@@ -169,11 +171,8 @@ describe('useLiveTracker', () => {
     let statusCallback;
     onSnapshot.mockImplementation((ref, cb) => {
       callCount++;
-      if (callCount === 1) {
-        onSnapshotCallback = cb;
-      } else {
-        statusCallback = cb;
-      }
+      if (ref?.type === 'docRef') statusCallback = cb;
+      else if (callCount === 1) onSnapshotCallback = cb;
       return unsubMock;
     });
 
@@ -194,6 +193,8 @@ describe('useLiveTracker', () => {
       number: 3,
       title: 'Ballet',
       isTracking: true,
+      startedAt: null,
+      phase: null,
     });
   });
 
@@ -206,8 +207,8 @@ describe('useLiveTracker', () => {
     let statusCallback;
     onSnapshot.mockImplementation((ref, cb) => {
       callCount++;
-      if (callCount === 1) onSnapshotCallback = cb;
-      else statusCallback = cb;
+      if (ref?.type === 'docRef') statusCallback = cb;
+      else if (callCount === 1) onSnapshotCallback = cb;
       return unsubMock;
     });
 
@@ -236,8 +237,8 @@ describe('useLiveTracker', () => {
     let statusCallback;
     onSnapshot.mockImplementation((ref, cb) => {
       callCount++;
-      if (callCount === 1) onSnapshotCallback = cb;
-      else statusCallback = cb;
+      if (ref?.type === 'docRef') statusCallback = cb;
+      else if (callCount === 1) onSnapshotCallback = cb;
       return unsubMock;
     });
 
@@ -291,8 +292,8 @@ describe('useLiveTracker', () => {
     let statusCallback;
     onSnapshot.mockImplementation((ref, cb) => {
       callCount++;
-      if (callCount === 1) onSnapshotCallback = cb;
-      else statusCallback = cb;
+      if (ref?.type === 'docRef') statusCallback = cb;
+      else if (callCount === 1) onSnapshotCallback = cb;
       return unsubMock;
     });
 
@@ -317,7 +318,8 @@ describe('useLiveTracker', () => {
   it('unsubscribes from shows listener on unmount', () => {
     const { unmount } = renderHook(() => useLiveTracker('org1', null));
     unmount();
-    expect(unsubMock).toHaveBeenCalledTimes(1);
+    // shows listener + live-show listener
+    expect(unsubMock).toHaveBeenCalledTimes(2);
   });
 
   it('does not subscribe while disabled (auth not ready), then subscribes once enabled', () => {
@@ -332,8 +334,8 @@ describe('useLiveTracker', () => {
     expect(result.current.loading).toBe(true);
     expect(result.current.recitalData).toBeNull();
 
-    // Auth becomes ready → the listener subscribes.
+    // Auth becomes ready → the shows and live-show listeners subscribe.
     rerender({ enabled: true });
-    expect(onSnapshot).toHaveBeenCalledTimes(1);
+    expect(onSnapshot).toHaveBeenCalledTimes(2);
   });
 });

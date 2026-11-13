@@ -1,192 +1,188 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
-import { Search as SearchIcon, Cloud, Share2, Check, Music, Heart, Hash, Star, Lock } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { clsx } from 'clsx';
+import { Search as SearchIcon, Share2, Check } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
 import ActCard from '../program/ActCard';
 import ActDetailModal from '../program/ActDetailModal';
 import { displayName } from '../../utils/names';
+import { findDancers, findActs } from '../../utils/find';
 
-export default function SearchView({ showData, selectedShow, favorites, currentAct, toggleFavorite, user, showId }) {
-  const { orgId } = useApp();
+const listNumbers = (nums) =>
+  nums.length <= 1 ? `${nums[0] ?? ''}` : `${nums.slice(0, -1).join(', ')} and ${nums[nums.length - 1]}`;
+
+// Find: one search box for dancers and acts. Dancers first (that's what parents
+// look for), searched across every show; acts from the show being viewed.
+export default function SearchView({ recitalData, showData, selectedShow, favorites, currentAct, actLog, toggleFavorite, user, showId }) {
+  const { orgId, canViewFullNames } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
-
-  const activeTab = searchParams.get('tab') === 'dancers' ? 'dancers' : 'acts';
   const [inputValue, setInputValue] = useState(() => searchParams.get('q') || '');
-  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
-  const debounceTimer = useRef(null);
+  const [query, setQuery] = useState(() => searchParams.get('q') || '');
   const [copied, setCopied] = useState(false);
   const [selectedAct, setSelectedAct] = useState(null);
+  const debounce = useRef(null);
+  const nameFn = useCallback((n) => displayName(n, canViewFullNames), [canViewFullNames]);
 
-  const setTab = (tab) => {
-    setSearchParams(prev => {
-      const next = new URLSearchParams(prev);
-      next.set('tab', tab);
-      next.delete('q');
-      return next;
-    });
-    setInputValue('');
-    setSearchQuery('');
+  const onChange = (e) => {
+    const v = e.target.value;
+    setInputValue(v);
+    clearTimeout(debounce.current);
+    debounce.current = setTimeout(() => {
+      setQuery(v);
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.delete('tab');
+        if (v.trim()) next.set('q', v); else next.delete('q');
+        return next;
+      }, { replace: true });
+    }, 200);
   };
 
-  const handleSearchChange = useCallback((e) => {
-    const val = e.target.value;
-    setInputValue(val);
-    clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => setSearchQuery(val), 250);
-  }, []);
+  const dancers = useMemo(
+    () => (user ? findDancers(recitalData, showId, query, nameFn) : []),
+    [recitalData, showId, query, nameFn, user]
+  );
+  const acts = useMemo(() => findActs(showData, query), [showData, query]);
+  const following = useMemo(() => [...(favorites || [])].filter(f => !f.startsWith('act-')), [favorites]);
 
   const handleShare = async () => {
-    const baseUrl = window.location.origin + window.location.pathname;
     const params = new URLSearchParams();
     if (orgId) params.set('org', orgId);
     if (selectedShow) params.set('show', selectedShow);
-    params.set('tab', activeTab);
-    if (searchQuery) params.set('q', searchQuery);
-    const shareUrl = `${baseUrl}?${params.toString()}`;
+    if (query) params.set('q', query);
+    const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
     if (navigator.share) {
-      try { await navigator.share({ title: 'Search', url: shareUrl }); return; }
-      catch { /* cancelled */ }
+      try { await navigator.share({ title: 'Find', url }); return; } catch { /* cancelled */ }
     }
-    await navigator.clipboard.writeText(shareUrl);
+    await navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // --- Acts tab logic ---
-  const actResults = useMemo(() => {
-    if (!searchQuery.trim() || !showData?.acts) return [];
-    const q = searchQuery.toLowerCase();
-    return showData.acts.filter(act =>
-      act.title?.toLowerCase().includes(q) ||
-      String(act.number).includes(q) ||
-      act.performers?.some(p => p.toLowerCase().includes(q))
-    );
-  }, [searchQuery, showData]);
-
-  const favoriteActs = useMemo(() => {
-    if (!showData?.acts || !favorites) return [];
-    return showData.acts.filter(act =>
-      favorites.has(showId ? `act-${showId}-${act.number}` : `act-${act.number}`) ||
-      act.performers?.some(p => favorites.has(p))
-    );
-  }, [showData, favorites, showId]);
-
-  // --- Dancers tab logic ---
-  const dancerResults = useMemo(() => {
-    if (!showData?.acts || !searchQuery.trim()) return [];
-    const q = searchQuery.toLowerCase();
-    const map = {};
-    showData.acts.forEach(act => {
-      act.performers?.forEach(name => {
-        if (name.toLowerCase().includes(q)) {
-          if (!map[name]) map[name] = [];
-          map[name].push({ number: act.number, title: act.title });
-        }
-      });
-    });
-    return Object.entries(map).map(([name, acts]) => ({ name, acts })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [searchQuery, showData]);
-
-  const favoriteDancers = useMemo(() => {
-    if (!showData?.acts || !favorites) return [];
-    const map = {};
-    showData.acts.forEach(act => {
-      act.performers?.forEach(name => {
-        if (favorites.has(name)) {
-          if (!map[name]) map[name] = [];
-          map[name].push({ number: act.number, title: act.title });
-        }
-      });
-    });
-    return Object.entries(map).map(([name, acts]) => ({ name, acts })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [showData, favorites]);
-
-  if (!showData || !showData.acts) {
-    return (
-      <div className="text-center py-12 sm:py-20 bg-white dark:bg-ink-800 rounded-card sm:rounded-card border border-ink-100 dark:border-ink-700 shadow-sm space-y-3">
-        <div className="w-16 h-16 bg-brand-50 dark:bg-brand-900/20 rounded-full flex items-center justify-center mx-auto">
-          <Music size={28} className="text-brand-300 dark:text-brand-700" />
-        </div>
-        <h3 className="text-base font-semibold dark:text-white">No Show Selected</h3>
-        <p className="text-ink-400 text-sm px-4">Select a show to search acts and dancers.</p>
-      </div>
-    );
-  }
-
-  const placeholder = activeTab === 'acts' ? 'Search acts by title, number, or performer…' : 'Search dancers by name…';
+  const hasQuery = query.trim().length > 0;
+  const nothing = hasQuery && dancers.length === 0 && acts.length === 0;
 
   return (
-    <div className="space-y-3 sm:space-y-4 animate-in fade-in pb-6">
-      {/* Tab bar */}
-      <div className="flex gap-1 p-1 bg-ink-100 dark:bg-ink-800 rounded-card">
-        <button
-          onClick={() => setTab('acts')}
-          className={clsx(
-            "flex-1 py-2.5 rounded-lg text-sm font-bold transition-all",
-            activeTab === 'acts'
-              ? "bg-white dark:bg-ink-700 text-brand-600 shadow-sm"
-              : "text-ink-500 dark:text-ink-400 hover:text-ink-700 dark:hover:text-white"
-          )}
-        >
-          Acts
-        </button>
-        <button
-          onClick={() => setTab('dancers')}
-          className={clsx(
-            "flex-1 py-2.5 rounded-lg text-sm font-bold transition-all",
-            activeTab === 'dancers'
-              ? "bg-white dark:bg-ink-700 text-brand-600 shadow-sm"
-              : "text-ink-500 dark:text-ink-400 hover:text-ink-700 dark:hover:text-white"
-          )}
-        >
-          Dancers
-        </button>
+    <div className="space-y-6 animate-in fade-in pb-6">
+      <div className="flex items-end gap-2">
+        <label className="flex-1 space-y-1.5">
+          <span className="text-sm font-semibold text-ink-700 dark:text-ink-200 px-0.5">Find a dancer or act</span>
+          <span className="relative block">
+            <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400 pointer-events-none" size={18} />
+            <input
+              type="search"
+              autoComplete="off"
+              enterKeyHint="search"
+              placeholder="Dancer's name, act title or number"
+              value={inputValue}
+              onChange={onChange}
+              className="w-full h-[52px] pl-11 pr-4 rounded-card bg-white dark:bg-ink-800 border-2 border-ink-300 dark:border-ink-600 focus:border-ink-900 dark:focus:border-white outline-none text-base font-medium dark:text-white"
+            />
+          </span>
+        </label>
+        {hasQuery && (
+          <button
+            onClick={handleShare}
+            aria-label="Share this search"
+            className="w-[52px] h-[52px] shrink-0 rounded-card border border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-800 flex items-center justify-center text-ink-600 dark:text-ink-300"
+          >
+            {copied ? <Check size={20} className="text-emerald-600" /> : <Share2 size={20} />}
+          </button>
+        )}
       </div>
 
-      {/* Search bar */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <SearchIcon className="absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 text-ink-400" size={18} />
-          <input
-            type="text"
-            placeholder={placeholder}
-            className="w-full bg-white dark:bg-ink-800 p-3.5 sm:p-4 pl-10 sm:pl-12 rounded-card sm:rounded-card shadow-sm border border-ink-200 dark:border-ink-700 font-bold text-[15px] sm:text-base dark:text-white outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition-all"
-            value={inputValue}
-            onChange={handleSearchChange}
-          />
-        </div>
-        <button
-          onClick={handleShare}
-          className="bg-white dark:bg-ink-800 w-12 sm:w-[52px] rounded-card sm:rounded-card shadow-sm border border-ink-200 dark:border-ink-700 flex items-center justify-center text-brand-600 hover:bg-brand-50 active:scale-95 transition-all shrink-0"
-          aria-label="Share search"
-        >
-          {copied ? <Check size={20} className="text-emerald-500" /> : <Share2 size={20} />}
-        </button>
-      </div>
+      {!hasQuery && (
+        <section className="space-y-3 px-0.5">
+          {user && following.length > 0 ? (
+            <>
+              <h2 className="text-sm font-semibold text-ink-500 dark:text-ink-400">You follow</h2>
+              <div className="flex flex-wrap gap-2">
+                {following.map(name => (
+                  <span key={name} className="h-9 pl-3 pr-1 rounded-pill bg-brand-50 dark:bg-brand-900/30 text-brand-800 dark:text-brand-200 text-sm font-semibold flex items-center gap-1">
+                    {nameFn(name)}
+                    <button onClick={() => toggleFavorite(name)} aria-label={`Stop following ${nameFn(name)}`} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-brand-100 dark:hover:bg-brand-900/50">×</button>
+                  </span>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="text-ink-600 dark:text-ink-300">
+              Type a first name to find your dancer, then follow them. We'll mark their acts in the program.
+            </p>
+          )}
+        </section>
+      )}
 
-      {activeTab === 'acts' ? (
-        <ActsPanel
-          searchQuery={searchQuery}
-          actResults={actResults}
-          favoriteActs={favoriteActs}
-          currentAct={currentAct}
-          toggleFavorite={toggleFavorite}
-          favorites={favorites}
-          showId={showId}
-          user={user}
-          onActClick={setSelectedAct}
-        />
-      ) : (
-        <DancersPanel
-          searchQuery={searchQuery}
-          dancerResults={dancerResults}
-          favoriteDancers={favoriteDancers}
-          favorites={favorites}
-          toggleFavorite={toggleFavorite}
-          user={user}
-        />
+      {hasQuery && !user && (
+        <p className="p-4 rounded-card border border-ink-200 dark:border-ink-700 text-sm text-ink-600 dark:text-ink-300">
+          Dancer names are only shown to signed-in families. <Link to="/settings" className="font-semibold underline">Sign in</Link> to search for a dancer.
+        </p>
+      )}
+
+      {dancers.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold text-ink-500 dark:text-ink-400 mb-1 px-0.5">Dancers</h2>
+          <ul className="divide-y divide-ink-100 dark:divide-ink-800 border-y border-ink-100 dark:border-ink-800">
+            {dancers.map(d => {
+              const isFollowing = favorites?.has(d.name);
+              return (
+                <li key={d.name} className="py-3 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold dark:text-white">{nameFn(d.name)}</p>
+                    {d.duplicate && <p className="text-xs font-semibold text-stage-700 dark:text-stage-300">Same name as another dancer. Check the act numbers.</p>}
+                    <p className="text-sm text-ink-600 dark:text-ink-400">
+                      {d.here.length > 0
+                        ? `Act${d.here.length > 1 ? 's' : ''} ${listNumbers(d.here.map(a => a.number))}`
+                        : 'Not in this show'}
+                      {d.elsewhere.map(e => (
+                        <span key={e.showId} className="block text-xs text-ink-500 dark:text-ink-500">
+                          Also in {e.label}: act{e.numbers.length > 1 ? 's' : ''} {listNumbers(e.numbers)}
+                        </span>
+                      ))}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => toggleFavorite(d.name)}
+                    aria-pressed={!!isFollowing}
+                    className={clsx(
+                      "h-11 px-4 rounded-card text-sm font-semibold shrink-0 transition-colors",
+                      isFollowing
+                        ? "bg-brand-700 text-white hover:bg-brand-800"
+                        : "border border-ink-800 dark:border-ink-300 text-ink-900 dark:text-white hover:bg-ink-50 dark:hover:bg-ink-800"
+                    )}
+                  >
+                    {isFollowing ? 'Following' : 'Follow'}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {acts.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold text-ink-500 dark:text-ink-400 mb-2 px-0.5">Acts in {showData?.label || 'this show'}</h2>
+          <div className="space-y-2.5">
+            {acts.map(act => (
+              <ActCard
+                key={act.number}
+                act={act}
+                isCurrent={currentAct?.isTracking && Number(act.number) === Number(currentAct.number)}
+                toggleFavorite={toggleFavorite}
+                favorites={favorites}
+                onClick={() => setSelectedAct(act)}
+                showId={showId}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {nothing && user && (
+        <p className="text-ink-600 dark:text-ink-300 px-0.5">
+          Nothing matches “{query.trim()}”. Try the first name only, or check the spelling.
+        </p>
       )}
 
       <ActDetailModal
@@ -197,183 +193,11 @@ export default function SearchView({ showData, selectedShow, favorites, currentA
         toggleFavorite={toggleFavorite}
         isCurrent={selectedAct && currentAct?.isTracking && Number(currentAct.number) === Number(selectedAct?.number)}
         showId={showId}
+        acts={showData?.acts}
+        onNavigate={setSelectedAct}
+        currentAct={currentAct}
+        actLog={actLog}
       />
-    </div>
-  );
-}
-
-function ActsPanel({ searchQuery, actResults, favoriteActs, currentAct, toggleFavorite, favorites, showId, user, onActClick }) {
-  if (searchQuery) {
-    if (actResults.length > 0) {
-      return (
-        <div className="space-y-2">
-          <p className="text-[11px] font-bold text-ink-400 px-0.5">{actResults.length} result{actResults.length !== 1 ? 's' : ''}</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4">
-            {actResults.map(act => (
-              <ActCard key={act.number} act={act} isCurrent={currentAct?.isTracking && act.number === currentAct.number} toggleFavorite={toggleFavorite} favorites={favorites} onClick={() => onActClick(act)} showId={showId} />
-            ))}
-          </div>
-        </div>
-      );
-    }
-    return (
-      <div className="text-center py-12 bg-white dark:bg-ink-800 rounded-card border border-ink-100 dark:border-ink-700">
-        <SearchIcon size={36} className="mx-auto text-ink-200 dark:text-ink-700 mb-3" />
-        <p className="text-ink-400 font-bold text-sm">No acts found for "{searchQuery}"</p>
-        <p className="text-ink-300 text-xs mt-1">Try a different search term</p>
-      </div>
-    );
-  }
-
-  if (favoriteActs.length > 0) {
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-0.5">
-          <h3 className="text-[10px] font-semibold uppercase text-ink-400 tracking-widest">Your Favorited Acts</h3>
-          {user && (
-            <div className="flex items-center gap-1 text-[9px] font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-md">
-              <Cloud size={10} /> Synced
-            </div>
-          )}
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4">
-          {favoriteActs.map(act => (
-            <ActCard key={act.number} act={act} isCurrent={currentAct?.isTracking && act.number === currentAct.number} toggleFavorite={toggleFavorite} favorites={favorites} onClick={() => onActClick(act)} showId={showId} />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="text-center py-12 bg-white dark:bg-ink-800 rounded-card border border-ink-100 dark:border-ink-700">
-      <SearchIcon size={36} className="mx-auto text-ink-200 dark:text-ink-700 mb-3" />
-      <p className="text-ink-400 font-bold text-sm">Search the program</p>
-      <p className="text-ink-300 text-xs mt-1">Find acts by title, number, or performer</p>
-    </div>
-  );
-}
-
-function DancerCard({ res, favorites, toggleFavorite }) {
-  const { canViewFullNames } = useApp();
-  const isFav = favorites?.has(res.name);
-  return (
-    <div className={clsx(
-      "p-3.5 sm:p-4 bg-white dark:bg-ink-800 rounded-card border shadow-sm h-full transition-all",
-      isFav
-        ? "border-brand-200 dark:border-brand-800 border-l-4 border-l-brand-600"
-        : "border-ink-100 dark:border-ink-700"
-    )}>
-      <div className="flex justify-between items-start gap-2">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className={clsx(
-            "w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold shrink-0",
-            isFav ? "bg-brand-100 dark:bg-brand-900/40 text-brand-600" : "bg-ink-100 dark:bg-ink-900 text-ink-400"
-          )}>
-            {res.name.charAt(0).toUpperCase()}
-          </div>
-          <div className="min-w-0">
-            <div className={clsx("font-bold text-sm truncate", isFav ? "text-brand-600 dark:text-brand-400" : "dark:text-white")}>
-              {displayName(res.name, canViewFullNames)}
-            </div>
-            <div className="text-[10px] font-bold text-ink-400">{res.acts.length} act{res.acts.length !== 1 ? 's' : ''}</div>
-          </div>
-        </div>
-        <button
-          onClick={() => toggleFavorite(res.name)}
-          className={clsx(
-            "p-2 rounded-card transition-colors shrink-0",
-            isFav ? "text-brand-600 bg-brand-50 dark:bg-brand-900/20" : "text-ink-300 hover:text-brand-400"
-          )}
-        >
-          <Star size={18} fill={isFav ? "currentColor" : "none"} />
-        </button>
-      </div>
-      <div className="mt-2.5 space-y-1">
-        {res.acts.map(a => (
-          <div key={a.number} className="flex items-center gap-1.5 text-[11px] sm:text-xs">
-            <span className={clsx(
-              "inline-flex items-center gap-0.5 font-bold px-1.5 py-0.5 rounded",
-              isFav ? "bg-brand-50 dark:bg-brand-900/20 text-brand-600" : "bg-ink-50 dark:bg-ink-900 text-ink-500"
-            )}>
-              <Hash size={9} />{a.number}
-            </span>
-            <span className="text-ink-500 dark:text-ink-400 truncate">{a.title}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DancersPanel({ searchQuery, dancerResults, favoriteDancers, favorites, toggleFavorite, user }) {
-  // Dancer names are hidden from logged-out visitors to protect performers'
-  // privacy — searching by name requires an account.
-  if (!user) {
-    return (
-      <div className="text-center py-12 bg-white dark:bg-ink-800 rounded-card border border-ink-100 dark:border-ink-700 space-y-4">
-        <div className="w-16 h-16 bg-brand-50 dark:bg-brand-900/20 rounded-full flex items-center justify-center mx-auto">
-          <Lock size={28} className="text-brand-400 dark:text-brand-600" />
-        </div>
-        <div>
-          <h3 className="text-base font-semibold dark:text-white mb-1">Sign in to search dancers</h3>
-          <p className="text-ink-400 text-sm max-w-sm mx-auto px-4">
-            Dancer names are hidden to protect performers' privacy. Sign in to search and favorite dancers.
-          </p>
-        </div>
-        <Link
-          to="/settings"
-          className="inline-flex items-center gap-2 px-5 py-3 bg-brand-600 text-white rounded-card font-bold text-sm shadow-lg shadow-brand-500/20 hover:bg-brand-700 transition-colors"
-        >
-          <Lock size={16} /> Sign In
-        </Link>
-      </div>
-    );
-  }
-
-  if (searchQuery) {
-    if (dancerResults.length > 0) {
-      return (
-        <div className="space-y-2">
-          <p className="text-[11px] font-bold text-ink-400 px-0.5">{dancerResults.length} dancer{dancerResults.length !== 1 ? 's' : ''}</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4">
-            {dancerResults.map(res => <DancerCard key={res.name} res={res} favorites={favorites} toggleFavorite={toggleFavorite} />)}
-          </div>
-        </div>
-      );
-    }
-    return (
-      <div className="text-center py-12 bg-white dark:bg-ink-800 rounded-card border border-ink-100 dark:border-ink-700">
-        <SearchIcon size={36} className="mx-auto text-ink-200 dark:text-ink-700 mb-3" />
-        <p className="text-ink-400 font-bold text-sm">No dancers found for "{searchQuery}"</p>
-        <p className="text-ink-300 text-xs mt-1">Try a different spelling</p>
-      </div>
-    );
-  }
-
-  if (favoriteDancers.length > 0) {
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-0.5">
-          <h3 className="text-[10px] font-semibold uppercase text-ink-400 tracking-widest">Your Favorited Dancers</h3>
-          {user && (
-            <div className="flex items-center gap-1 text-[9px] font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-md">
-              <Cloud size={10} /> Synced
-            </div>
-          )}
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4">
-          {favoriteDancers.map(res => <DancerCard key={res.name} res={res} favorites={favorites} toggleFavorite={toggleFavorite} />)}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="text-center py-12 bg-white dark:bg-ink-800 rounded-card border border-ink-100 dark:border-ink-700">
-      <Heart size={36} className="mx-auto text-ink-200 dark:text-ink-700 mb-3" />
-      <p className="text-ink-400 font-bold text-sm">Search for a performer</p>
-      <p className="text-ink-300 text-xs mt-1">Type a name above to find their acts</p>
     </div>
   );
 }
